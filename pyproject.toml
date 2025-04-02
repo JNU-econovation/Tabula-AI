@@ -2,17 +2,13 @@
 name = "tabula"
 version = "1.0.0"
 description = "Tabula: A Blank Slate Learning Method Assistance Service"
-authors = [
-    {name = "Tabula",email = "blankest2025@gmail.com"}
-]
+authors = [{name = "Tabula",email = "blankest2025@gmail.com"}]
 readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-
-
-[tool.poetry]
-packages = [{include = "tabula", from = "src"}]
+note-service = { path = "services/note-service", develop = true }
+result-service = { path = "services/result-service", develop = true }
 
 
 [build-system]

@@ -1,0 +1,15 @@
+[project]
+name = "tabula-note-sdk"
+version = "1.0.0"
+description = "Note Service API for processing note data and providing guidelines"
+
+
+[tool.poetry.dependencies]
+python = "^3.11"
+common-sdk = { path = "../../libs/common-sdk", develop = true }
+note-sdk = { path = "../../libs/note-sdk", develop = true }
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
+

@@ -1,0 +1,13 @@
+[project]
+name = "tabula-note-sdk"
+version = "1.0.0"
+description = "An SDK for grading based on user-uploaded learning outcomes"
+
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

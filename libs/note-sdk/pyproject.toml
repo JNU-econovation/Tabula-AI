@@ -1,0 +1,13 @@
+[project]
+name = "tabula-common-sdk"
+version = "1.0.0"
+description = "An SDK that processes user-uploaded learning materials"
+
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"
