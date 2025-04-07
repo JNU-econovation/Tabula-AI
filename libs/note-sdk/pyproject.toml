@@ -1,5 +1,5 @@
 [project]
-name = "tabula-common-sdk"
+name = "tabula-note-sdk"
 version = "1.0.0"
 description = "An SDK that processes user-uploaded learning materials"
 

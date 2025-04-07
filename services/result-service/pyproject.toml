@@ -1,13 +1,13 @@
 [project]
-name = "tabula-note-sdk"
+name = "tabula-result-service"
 version = "1.0.0"
 description = "Result Service API for processing result data (OCR, grading) and providing feedback"
 
 
 [tool.poetry.dependencies]
 python = "^3.11"
-common-sdk = { path = "../../libs/common-sdk", develop = true }
-result-sdk = { path = "../../libs/result-sdk", develop = true }
+tabula-common-sdk = { path = "../../libs/common-sdk", develop = true }
+tabula-result-sdk = { path = "../../libs/result-sdk", develop = true }
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

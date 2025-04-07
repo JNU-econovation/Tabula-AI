@@ -7,8 +7,8 @@ readme = "README.md"
 
 [tool.poetry.dependencies]
 python = "^3.11"
-note-service = { path = "services/note-service", develop = true }
-result-service = { path = "services/result-service", develop = true }
+tabula-note-service = { path = "services/note-service", develop = true }
+tabula-result-service = { path = "services/result-service", develop = true }
 
 
 [build-system]

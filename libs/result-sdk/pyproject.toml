@@ -1,5 +1,5 @@
 [project]
-name = "tabula-note-sdk"
+name = "tabula-result-sdk"
 version = "1.0.0"
 description = "An SDK for grading based on user-uploaded learning outcomes"
 
