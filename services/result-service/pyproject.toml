@@ -1,8 +1,10 @@
-[project]
+[tool.poetry]
 name = "tabula-result-service"
 version = "1.0.0"
 description = "Result Service API for processing result data (OCR, grading) and providing feedback"
-
+packages = [
+    { include = "result_service" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"

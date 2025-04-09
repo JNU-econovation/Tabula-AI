@@ -1,8 +1,10 @@
-[project]
+[tool.poetry]
 name = "tabula-note-sdk"
 version = "1.0.0"
 description = "An SDK that processes user-uploaded learning materials"
-
+packages = [
+    { include = "note_sdk" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"

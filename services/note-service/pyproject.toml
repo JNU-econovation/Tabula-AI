@@ -1,8 +1,10 @@
-[project]
+[tool.poetry]
 name = "tabula-note-service"
 version = "1.0.0"
 description = "Note Service API for processing note data and providing guidelines"
-
+packages = [
+    { include = "note_service" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"

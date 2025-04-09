@@ -1,8 +1,10 @@
-[project]
+[tool.poetry]
 name = "tabula-common-sdk"
 version = "1.0.0"
 description = "Common SDK for environment configuration and utility functions"
-
+packages = [
+    { include = "common_sdk" }
+]
 
 [tool.poetry.dependencies]
 python = "^3.11"

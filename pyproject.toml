@@ -1,14 +1,20 @@
-[project]
+[tool.poetry] #PEP621프로젝트 블럭 형태인 [project]를 -> [tool.poetry]로 변경 (poetry표준형 준수) 
 name = "tabula"
 version = "1.0.0"
 description = "Tabula: A Blank Slate Learning Method Assistance Service"
-authors = [{name = "Tabula",email = "blankest2025@gmail.com"}]
+authors = ["Tabula <blankest2025@gmail.com>"] #authors 키는 문자열 형태로 작성해야하기에 변경 (변경전: poetry install 시 다음과 같은 오류 발생 -> The Poetry configuration is invalid:  - tool.poetry.authors[0] must be string)
 readme = "README.md"
+packages = [ ]
+package-mode = false #루트 디렉터리는 패키지로 취급 X (해당 옵션이 없을경우 poetry install --no-root 을 이용해 설치해야함)
+
 
 [tool.poetry.dependencies]
 python = "^3.11"
 tabula-note-service = { path = "services/note-service", develop = true }
 tabula-result-service = { path = "services/result-service", develop = true }
+tabula-common-sdk = { path = "libs/common-sdk", develop = true }
+tabula-note-sdk = { path = "libs/note-sdk", develop = true }
+tabula-result-sdk = { path = "libs/result-sdk", develop = true }
 
 
 [build-system]
