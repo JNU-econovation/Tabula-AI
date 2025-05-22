@@ -206,6 +206,6 @@ pyrightconfig.json
 *.txt
 *.csv
 *.json
-*.yaml
-*.yml
-*.pdf
+
+# log
+*.log
