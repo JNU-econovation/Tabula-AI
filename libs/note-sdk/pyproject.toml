@@ -8,7 +8,23 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-
+tabula-common-sdk = { path = "../../libs/common-sdk", develop = true }
+langchain = ">=0.3.20"
+langchain-core = ">=0.3.43"
+langchain-openai = ">=0.3.8"
+langgraph = ">=0.3.5"
+langsmith = ">=0.3.13"
+ipython = ">=9.2.0,<10.0.0"
+anthropic = ">=0.50.0,<0.51.0"
+pymupdf = ">=1.25.5,<2.0.0"
+pypdf2 = ">=3.0.1,<4.0.0"
+pinecone = "==6.0.2"
+pinecone-plugin-interface = "==0.0.7"
+pinecone-text = "==0.10.0"
+tiktoken = ">=0.9.0,<0.10.0"
+pillow = ">=11.2.1,<12.0.0"
+beautifulsoup4 = "^4.13.4"
+pandas = "^2.2.3"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]

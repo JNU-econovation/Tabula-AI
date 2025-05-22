@@ -187,3 +187,25 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python,dotenv,jupyternotebooks
+
+# image / markdown
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.md
+*.pdf
+*.docx
+*.doc
+*.xls
+*.xlsx
+*.pptx
+*.ppt
+*.txt
+*.csv
+*.json
+
+# log
+*.log
