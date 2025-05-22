@@ -9,7 +9,10 @@ class Settings:
     UPSTAGE_API_KEY = os.getenv("UPSTAGE_API_KEY")
     LANGSMITH_API_KEY = os.getenv("LANGSMITH_API_KEY")
     CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY")
-    OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+    OPENAI_API_KEY_J = os.getenv("OPENAI_API_KEY_J")
+    OPENAI_API_KEY_K = os.getenv("OPENAI_API_KEY_K")
+    OPENAI_API_KEY_B = os.getenv("OPENAI_API_KEY_B")
 
     PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
 

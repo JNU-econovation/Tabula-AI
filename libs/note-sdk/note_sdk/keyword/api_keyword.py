@@ -36,7 +36,7 @@ class KeywordGuide:
             temperature: LLM의 temperature 값
         """
         self.domain_type = domain
-        self.llm = ChatOpenAI(model=llm_model_name, temperature=temperature, openai_api_key=settings.OPENAI_API_KEY)
+        self.llm = ChatOpenAI(model=llm_model_name, temperature=temperature, openai_api_key=settings.OPENAI_API_KEY_J)
         print(f"\n=== 모델 정보 ===")
         print(f"사용 모델: {llm_model_name}")
         print(f"Temperature: {temperature}")

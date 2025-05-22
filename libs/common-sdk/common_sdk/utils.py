@@ -9,7 +9,7 @@ upstage = OpenAI(
 )
 
 # OpenAI 클라이언트
-client = OpenAI(api_key=settings.OPENAI_API_KEY)
+client = OpenAI(api_key=settings.OPENAI_API_KEY_J)
 
 # 텍스트 임베딩 생성
 def get_embedding(text: str, language: Literal["ko", "en"] = "ko") -> List[float]:

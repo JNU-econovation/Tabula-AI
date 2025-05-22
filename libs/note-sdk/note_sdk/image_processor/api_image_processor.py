@@ -33,7 +33,7 @@ class ObjectSummary:
     def __init__(self, image_base_path: str = "/Users/kyeong6/Desktop/test/parse/result"):
         """ObjectSummary 초기화"""
         # OpenAI 클라이언트 초기화
-        self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
+        self.client = OpenAI(api_key=settings.OPENAI_API_KEY_J)
         self.image_base_path = image_base_path
         
         # 프롬프트 로드
@@ -52,7 +52,7 @@ class ObjectSummary:
         self.total_prompt_tokens = self.system_tokens + self.user_tokens
         
         # LLM 인스턴스 생성
-        llm_instance = ChatOpenAI(model_name=LLMs.GPT4.value, openai_api_key=settings.OPENAI_API_KEY)
+        llm_instance = ChatOpenAI(model_name=LLMs.GPT4.value, openai_api_key=settings.OPENAI_API_KEY_J)
 
         # MultiModal 모델 초기화
         self.image_model = MultiModal(

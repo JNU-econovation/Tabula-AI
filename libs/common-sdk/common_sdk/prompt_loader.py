@@ -14,10 +14,12 @@ class PromptLoader:
         for filename in os.listdir(prompts_dir):
             if filename.endswith(".yaml"):
                 with open(os.path.join(prompts_dir, filename), "r", encoding="utf-8") as f:
-                    prompts = yaml.safe_load(f)
-                    self._prompts.update(prompts)
+                    prompt_data = yaml.safe_load(f)
+                    # 파일 이름에서 확장자를 제거하고 키로 사용
+                    prompt_key = os.path.splitext(filename)[0].lower()
+                    self._prompts[prompt_key] = prompt_data
 
-    def get_prompt(self, prompt_key: str) -> str:
+    def load_prompt(self, prompt_key: str) -> Any:
         """Get a prompt by its key."""
         if prompt_key not in self._prompts:
             raise KeyError(f"Prompt key '{prompt_key}' not found")
