@@ -3,6 +3,7 @@ from .get_logger import get_logger, logger
 from .utils import get_embedding
 from .prompt_loader import PromptLoader
 from .conn import MongoDB, S3Storage
+from .trace import langsmith
 
 __version__ = "1.0.0"
 
@@ -23,4 +24,7 @@ __all__ = [
     # 데이터베이스 & 스토리지
     'MongoDB',
     'S3Storage',
+
+    # 추적
+    'langsmith',
 ]
