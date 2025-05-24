@@ -1,4 +1,4 @@
-from typing import Dict
+from typing import Dict, Any
 from dataclasses import dataclass
 from copy import deepcopy
 

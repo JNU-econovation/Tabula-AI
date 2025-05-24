@@ -1,3 +1,3 @@
-from .api_image_processor import ObjectSummary
+from .api_image_processor import ImageSummary
 
-__all__ = ['ObjectSummary']
+__all__ = ['ImageSummary']

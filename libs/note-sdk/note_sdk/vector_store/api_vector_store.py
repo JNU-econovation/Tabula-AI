@@ -1,17 +1,7 @@
-# import os
-# import sys
-# import time
-
-# # 현재 파일의 디렉토리
-# current_dir = os.path.dirname(os.path.abspath(__file__))
-# # 프로젝트 루트 디렉토리 
-# project_root = os.path.dirname(current_dir)
-# sys.path.insert(0, project_root)
-
 import re
 import asyncio
 from pinecone import Pinecone
-from common_sdk.config import settings
+from note_sdk.config import settings
 from common_sdk.utils import get_embedding
 from typing import List, Dict, Any, Literal
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -180,7 +170,7 @@ class VectorLoader:
             logger.error(f"Dense vector upsertion error: {e}")
             return False
 
-    def _convert_sparse_vector_format(self, sparse_vector: Dict) -> List:
+    def convert_sparse_vector_format(self, sparse_vector: Dict) -> List:
         """sparse vector 형식을 Pinecone이 기대하는 형식으로 변환"""
         try:
             if not isinstance(sparse_vector, dict):
@@ -334,43 +324,3 @@ class VectorLoader:
             "text": self.processed_vectors["text"],
             "image": self.processed_vectors["image"]
         }
-
-# async def main():
-#     """메인 테스트 함수"""
-#     # 테스트용 마크다운 파일 경로
-#     md_path = "/Users/kyeong6/Desktop/test/parse/result/md/korean.md"
-#     document_id = "korean_test"
-    
-#     try:
-#         # VectorLoader 인스턴스 생성 (한국어)
-#         loader = VectorLoader(language="ko")
-        
-#         # 마크다운 파일 읽기
-#         with open(md_path, 'r', encoding='utf-8') as f:
-#             content = f.read()
-        
-#         print(f"\n=== 마크다운 벡터 DB 적재 테스트 시작 ===")
-#         print(f"문서 ID: {document_id}")
-#         print(f"파일 경로: {md_path}")
-        
-#         # 마크다운 처리 및 벡터 DB 적재
-#         success = await loader.process_markdown(content, document_id)
-        
-#         if success:
-#             print("\n=== 처리 결과 ===")
-#             stats = loader.get_processing_stats()
-#             print(f"텍스트 벡터:")
-#             print(f"  - Dense: {stats['text']['dense']}개")
-#             print(f"  - Sparse: {stats['text']['sparse']}개")
-#             print(f"이미지 벡터:")
-#             print(f"  - Dense: {stats['image']['dense']}개")
-#             print(f"  - Sparse: {stats['image']['sparse']}개")
-#             print("\n테스트 성공!")
-#         else:
-#             print("\n테스트 실패!")
-            
-#     except Exception as e:
-#         print(f"\n테스트 중 오류 발생: {str(e)}")
-
-# if __name__ == "__main__":
-#     asyncio.run(main())

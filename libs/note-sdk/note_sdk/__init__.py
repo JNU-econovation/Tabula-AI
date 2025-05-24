@@ -1,4 +1,4 @@
-from .image_processor import ObjectSummary
+from .image_processor import ImageSummary
 from .keyword import KeywordGuide
 from .llm import LLMs, MultiModal, stream_graph, random_uuid
 from .parsing import ParseConfig, parse_document
@@ -8,7 +8,7 @@ __version__ = "1.0.0"
 
 __all__ = [
     # 이미지 처리
-    'ObjectSummary',
+    'ImageSummary',
     
     # 키워드 추출
     'KeywordGuide',

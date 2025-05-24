@@ -1,6 +1,7 @@
 import os
 import yaml
 from typing import Dict, Any
+from .config import settings
 
 class PromptLoader:
     def __init__(self):
@@ -9,7 +10,7 @@ class PromptLoader:
 
     def _load_prompts(self):
         """Load all YAML files from the prompts directory."""
-        prompts_dir = os.path.join(os.path.dirname(__file__), "prompts")
+        prompts_dir = settings.PROMPT_BASE_PATH
         
         for filename in os.listdir(prompts_dir):
             if filename.endswith(".yaml"):

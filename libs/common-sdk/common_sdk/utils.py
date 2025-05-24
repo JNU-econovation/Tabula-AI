@@ -1,3 +1,4 @@
+import tiktoken
 from openai import OpenAI
 from .config import settings
 from typing import List, Literal
@@ -10,6 +11,12 @@ upstage = OpenAI(
 
 # OpenAI 클라이언트
 client = OpenAI(api_key=settings.OPENAI_API_KEY_J)
+
+def num_tokens_from_string(string: str, encoding_name: str = "cl100k_base") -> int:
+    """문자열의 토큰 수를 계산"""
+    encoding = tiktoken.get_encoding(encoding_name)
+    num_tokens = len(encoding.encode(string))
+    return num_tokens
 
 # 텍스트 임베딩 생성
 def get_embedding(text: str, language: Literal["ko", "en"] = "ko") -> List[float]:
@@ -39,3 +46,5 @@ def get_embedding(text: str, language: Literal["ko", "en"] = "ko") -> List[float
     except Exception as e:
         print(f"임베딩 생성 실패: {str(e)}")
         raise
+
+# pinecone 클라이언트 연결 및 BM25 인코더 설정 필요

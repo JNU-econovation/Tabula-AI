@@ -1,8 +1,13 @@
+import os
+import pymupdf
 from note_sdk.parsing.state import ParseState
 from note_sdk.parsing.base import BaseNode
-import pymupdf
-import os
 from PyPDF2 import PdfReader, PdfWriter
+from note_sdk.config import settings
+from common_sdk.get_logger import get_logger
+import shutil
+
+logger = get_logger()
 
 """
 유틸리티 함수 정의
@@ -25,18 +30,26 @@ class SplitPDFFilesNode(BaseNode):
         filepath = state["filepath"]
         document_id = os.path.splitext(os.path.basename(filepath))[0]
         
-        # 임시 디렉토리 생성
-        temp_dir = os.path.join("temp", document_id)
+        # 임시 디렉토리 생성 - settings.get_temp_dir() 사용
+        temp_dir = settings.get_temp_dir(document_id)
+        
+        # 이미 존재하는 디렉토리인 경우 정리
+        if os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+        
+        # 새로운 임시 디렉토리 생성
         os.makedirs(temp_dir, exist_ok=True)
+        logger.info(f"임시 디렉토리 생성: {temp_dir}")
 
         # PDF 파일 열기
         input_pdf = pymupdf.open(filepath)
         num_pages = len(input_pdf)
-        self.log(f"파일의 전체 페이지 수: {num_pages} Pages.")
+        logger.info(f"파일의 전체 페이지 수: {num_pages} Pages.")
 
         if self.test_page is not None:
             if self.test_page < num_pages:
                 num_pages = self.test_page
+                logger.info(f"테스트 모드: 처음 {num_pages} 페이지만 처리")
 
         ret = []
         # PDF 분할 작업 시작
@@ -46,7 +59,7 @@ class SplitPDFFilesNode(BaseNode):
 
             # 분할된 PDF 파일명 생성 (임시 디렉토리에 저장)
             output_file = os.path.join(temp_dir, f"{document_id}_{start_page:04d}_{end_page:04d}.pdf")
-            self.log(f"분할 PDF 생성: {output_file}")
+            logger.info(f"분할 PDF 생성: {output_file}")
 
             # 새로운 PDF 파일 생성 및 페이지 삽입
             with pymupdf.open() as output_pdf:
@@ -56,15 +69,17 @@ class SplitPDFFilesNode(BaseNode):
 
         # 원본 PDF 파일 닫기
         input_pdf.close()
+        logger.info(f"PDF 분할 완료: {len(ret)}개의 파일 생성됨")
 
         # filepath를 포함하여 반환
         return {
             "split_filepaths": ret,
             "filepath": filepath,  # 원본 filepath 유지
-            "filetype": "pdf"      # filetype 추가
+            "filetype": "pdf",     # filetype 추가
+            "temp_dir": temp_dir   # temp 디렉토리 경로 추가
         }
 
-    def _split_pdf(self, pdf_path, output_dir, max_pages):
+    def split_pdf(self, pdf_path, output_dir, max_pages):
         """PDF 파일을 페이지별로 분할하는 함수"""
         # load/pdf/{document_id} 디렉토리에 저장
         document_id = os.path.splitext(os.path.basename(pdf_path))[0]

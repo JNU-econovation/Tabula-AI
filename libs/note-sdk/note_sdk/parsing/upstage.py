@@ -1,12 +1,14 @@
-import requests
-import json
 import os
 import time
 import shutil
-import tempfile
+import requests
 from note_sdk.parsing.base import BaseNode
 from note_sdk.parsing.state import ParseState
-from common_sdk.config import settings
+from note_sdk.config import settings
+from common_sdk.config import settings as common_settings
+from common_sdk.get_logger import get_logger
+
+logger = get_logger()
 
 """
 Upstage API 호출 관련 기능
@@ -15,14 +17,14 @@ Upstage API 호출 관련 기능
 DEFAULT_CONFIG = {
     "ocr": False,
     "coordinates": True,
-    "output_formats": "['html', 'text', 'markdown']",
+    "output_formats": "['text', 'markdown']",
     "model": "document-parse",
-    "base64_encoding": "['figure', 'chart', 'table']",
+    "base64_encoding": "['figure', 'chart']",
 }
 
 
 class DocumentParseNode(BaseNode):
-    def __init__(self, use_ocr=False, verbose=False, output_dir="load", **kwargs):
+    def __init__(self, use_ocr=False, verbose=False, output_dir="result", **kwargs):
         """
         DocumentParse 클래스의 생성자
 
@@ -31,16 +33,17 @@ class DocumentParseNode(BaseNode):
         :param output_dir: 출력 디렉토리 경로
         """
         super().__init__(verbose=verbose, **kwargs)
-        self.api_key = settings.UPSTAGE_API_KEY
+        self.api_key = common_settings.UPSTAGE_API_KEY
         if not self.api_key:
-            raise ValueError("UPSTAGE_API_KEY가 설정되지 않았습니다. .env 파일을 확인하세요.")
+            logger.error("UPSTAGE_API_KEY is not set")
+            raise ValueError()
         self.config = DEFAULT_CONFIG
         if use_ocr:
             self.config["ocr"] = True
         self.output_dir = output_dir
         self.temp_dir = None
 
-    def _upstage_layout_analysis(self, input_file):
+    def upstage_layout_analysis(self, input_file):
         """
         Upstage의 Document Parse API를 호출하여 문서 분석을 수행합니다.
 
@@ -48,9 +51,17 @@ class DocumentParseNode(BaseNode):
         :return: 분석 결과가 저장된 JSON 파일의 경로
         """
         try:
-            # 임시 디렉토리 생성
-            self.temp_dir = tempfile.mkdtemp(prefix="upstage_parse_")
-            self.log(f"임시 디렉토리 생성: {self.temp_dir}")
+            # 임시 디렉토리 생성 - settings.get_temp_dir() 사용
+            document_id = os.path.splitext(os.path.basename(input_file))[0]
+            self.temp_dir = settings.get_temp_dir(document_id)
+            
+            # 이미 존재하는 디렉토리인 경우 정리
+            if os.path.exists(self.temp_dir):
+                shutil.rmtree(self.temp_dir)
+            
+            # 새로운 임시 디렉토리 생성
+            os.makedirs(self.temp_dir, exist_ok=True)
+            logger.info(f"임시 디렉토리 생성: {self.temp_dir}")
 
             # API 요청 헤더 설정
             headers = {"Authorization": f"Bearer {self.api_key}"}
@@ -73,15 +84,9 @@ class DocumentParseNode(BaseNode):
                 return result
             else:
                 # API 요청이 실패한 경우 예외 발생
-                raise ValueError(f"API 요청 실패. 상태 코드: {response.status_code}")
+                logger.error(f"API request failed. Status code: {response.status_code}")
+                raise ValueError()
         finally:
-            # 임시 디렉토리 정리
-            if self.temp_dir and os.path.exists(self.temp_dir):
-                try:
-                    shutil.rmtree(self.temp_dir)
-                    self.log(f"임시 디렉토리 정리 완료: {self.temp_dir}")
-                except Exception as e:
-                    self.log(f"임시 디렉토리 정리 중 오류 발생: {str(e)}")
             # 파일 핸들 닫기
             if 'files' in locals():
                 files['document'].close()
@@ -127,11 +132,11 @@ class DocumentParseNode(BaseNode):
             raise ValueError("filepath is required in state")
         
         start_time = time.time()
-        self.log(f"Start Parsing: {state['working_filepath']}")
+        logger.info(f"Start Parsing: {state['working_filepath']}")
 
         try:
             filepath = state["working_filepath"]
-            parsed_json = self._upstage_layout_analysis(filepath)
+            parsed_json = self.upstage_layout_analysis(filepath)
 
             # 파일명에서 시작 페이지 추출
             start_page, _ = self.parse_start_end_page(filepath)
@@ -151,24 +156,17 @@ class DocumentParseNode(BaseNode):
             }
 
             duration = time.time() - start_time
-            self.log(f"Finished Parsing in {duration:.2f} seconds")
+            logger.info(f"Finished Parsing in {duration:.2f} seconds")
 
             return {
                 "metadata": [metadata],
                 "raw_elements": [data["elements"]],
-                "filepath": state["filepath"]  # filepath 유지
+                "filepath": state["filepath"],  # filepath 유지
+                "temp_dir": self.temp_dir  # temp 디렉토리 경로 추가
             }
         except Exception as e:
-            self.log(f"파싱 중 오류 발생: {str(e)}")
+            logger.error(f"파싱 중 오류 발생: {str(e)}")
             raise
-        finally:
-            # 임시 디렉토리 정리
-            if self.temp_dir and os.path.exists(self.temp_dir):
-                try:
-                    shutil.rmtree(self.temp_dir)
-                    self.log(f"임시 디렉토리 정리 완료: {self.temp_dir}")
-                except Exception as e:
-                    self.log(f"임시 디렉토리 정리 중 오류 발생: {str(e)}")
 
 
 class PostDocumentParseNode(BaseNode):
@@ -189,7 +187,7 @@ class PostDocumentParseNode(BaseNode):
 
                 post_processed_elements.append(elem)
 
-        self.log(f"Total Post-processed Elements: {id_counter}")
+        logger.info(f"Total Post-processed Elements: {id_counter}")
 
         pages_count = 0
         metadata = state["metadata"]
@@ -201,7 +199,16 @@ class PostDocumentParseNode(BaseNode):
 
         total_cost = pages_count * 0.01
 
-        self.log(f"Total Cost: ${total_cost:.2f}")
+        logger.info(f"Total Cost: ${total_cost:.2f}")
+
+        # 임시 디렉토리 정리
+        temp_root_dir = settings.get_temp_dir(state["filepath"])
+        if os.path.exists(temp_root_dir):
+            try:
+                shutil.rmtree(temp_root_dir)
+                logger.info(f"Temporary directory cleaned: {temp_root_dir}")
+            except Exception as e:
+                logger.error(f"Error cleaning temporary directory: {str(e)}")
 
         # 재정렬된 elements를 state에 업데이트
         return {
