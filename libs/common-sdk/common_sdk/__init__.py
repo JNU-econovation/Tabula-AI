@@ -1,6 +1,6 @@
 from .config import settings
 from .get_logger import get_logger, logger
-from .utils import get_embedding
+from .utils import get_embedding, num_tokens_from_string
 from .prompt_loader import PromptLoader
 from .conn import MongoDB, S3Storage
 from .trace import langsmith
@@ -17,6 +17,7 @@ __all__ = [
     
     # 유틸리티
     'get_embedding',
+    'num_tokens_from_string',
     
     # 프롬프트
     'PromptLoader',

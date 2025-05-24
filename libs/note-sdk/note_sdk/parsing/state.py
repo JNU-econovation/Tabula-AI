@@ -1,5 +1,5 @@
-from typing import TypedDict, Annotated, List, Dict
 import operator
+from typing import TypedDict, Annotated, List, Dict
 from note_sdk.parsing.element import Element
 from langchain_core.documents import Document
 
@@ -41,16 +41,8 @@ class ParseState(TypedDict):
         Dict[int, List[Element]], "images_by_page"
     ]  # images by page
 
-    tables_by_page: Annotated[
-        Dict[int, List[Element]], "tables_by_page"
-    ]  # tables by page
-
     extracted_image_entities: Annotated[
         List[Element], "extracted_image_entities"
     ]  # extracted image entities
-
-    extracted_table_entities: Annotated[
-        List[Element], "extracted_table_entities"
-    ]  # extracted table entities
 
     documents: Annotated[List[Document], "documents"]

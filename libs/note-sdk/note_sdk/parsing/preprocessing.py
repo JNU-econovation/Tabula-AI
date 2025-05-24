@@ -1,9 +1,11 @@
+import os
+import base64
 from note_sdk.parsing.state import ParseState
 from note_sdk.parsing.element import Element
-import base64
-import os
 from note_sdk.parsing.base import BaseNode
-from langchain_core.documents import Document
+from common_sdk.get_logger import get_logger
+
+logger = get_logger()
 
 """
 문서 전처리 관련 기능
@@ -11,9 +13,9 @@ from langchain_core.documents import Document
 
 IMAGE_TYPES = ["figure", "chart"]
 TEXT_TYPES = ["text", "equation", "caption", "paragraph", "list", "index", "heading1"]
-TABLE_TYPES = ["table"]
 
 
+# 요소 생성 노드 클래스
 class CreateElementsNode(BaseNode):
     def __init__(self, verbose=False, add_newline=True, **kwargs):
         super().__init__(verbose=verbose, **kwargs)
@@ -59,28 +61,6 @@ class CreateElementsNode(BaseNode):
                     markdown=element["content"]["markdown"],
                     page=element["page"],
                     id=element["id"],
-                )
-
-            elif element["category"] in ["table"]:
-                # (markdown + image crop/image save)
-                # table
-                image_filename = self._save_base64_image(
-                    element["base64_encoding"],
-                    base_filename,
-                    element["page"],
-                    element["id"],
-                    directory,
-                )
-                elem = Element(
-                    category=element["category"],
-                    content=element["content"]["markdown"] + self.newline,
-                    html=element["content"]["html"],
-                    markdown=element["content"]["markdown"],
-                    base64_encoding=element["base64_encoding"],
-                    image_filename=image_filename,
-                    page=element["page"],
-                    id=element["id"],
-                    coordinates=element["coordinates"],
                 )
 
             elif element["category"] in ["figure", "chart"]:
@@ -134,8 +114,9 @@ class CreateElementsNode(BaseNode):
         return {"elements": post_processed_elements}
 
 
+# 엔티티 병합 노드
 class MergeEntityNode(BaseNode):
-    def __init__(self, verbose=False):
+    def __init__(self, verbose: bool = True):
         super().__init__(verbose)
 
     def execute(self, state: ParseState) -> ParseState:
@@ -147,21 +128,16 @@ class MergeEntityNode(BaseNode):
                     e.entity = elem.entity
                     break
 
-        for elem in state["extracted_table_entities"]:
-            for e in elements:
-                if elem.id == e.id:
-                    e.entity = elem.entity
-                    break
-
         return {"elements": elements}
 
 
+# 요소 재구성 노드
 class ReconstructElementsNode(BaseNode):
     def __init__(self, verbose=False, use_relative_path=True):
         super().__init__(verbose)
         self.use_relative_path = use_relative_path
 
-    def _add_src_to_markdown(self, image_filename):
+    def add_src_to_markdown(self, image_filename):
         """마크다운 이미지 문법에 src 경로를 추가하는 함수
 
         상대 경로를 사용하도록 설정된 경우 ./images/{category}/{basename} 형식의 상대 경로를 사용하고,
@@ -198,7 +174,7 @@ class ReconstructElementsNode(BaseNode):
         if len(parts) >= 2:
             category_part = parts[1].lower()
             # 알려진 카테고리 중 하나인지 확인
-            if category_part in ["figure", "chart", "table"]:
+            if category_part in ["figure", "chart"]:
                 category = category_part
             else:
                 # 기본값은 figure
@@ -227,28 +203,16 @@ class ReconstructElementsNode(BaseNode):
             reconstructed_elements[int(page_num)] = {
                 "text": "",
                 "image": [],
-                "table": [],
             }
 
         for elem in elements:
-            if elem.category in TABLE_TYPES:
-                table_elem = {
-                    "content": elem.content + "\n\n" + elem.entity,
-                    "metadata": {
-                        "table": elem.content,
-                        "entity": elem.entity,
-                        "page": elem.page,
-                        "source": basename,  # filepath 대신 basename 사용
-                    },
-                }
-                reconstructed_elements[elem.page]["table"].append(table_elem)
-            elif elem.category in IMAGE_TYPES:
+            if elem.category in IMAGE_TYPES:
                 image_elem = {
-                    "content": self._add_src_to_markdown(elem.image_filename)
+                    "content": self.add_src_to_markdown(elem.image_filename)
                     + "\n\n"
                     + elem.entity,
                     "metadata": {
-                        "image": self._add_src_to_markdown(elem.image_filename),
+                        "image": self.add_src_to_markdown(elem.image_filename),
                         "entity": elem.entity,
                         "page": elem.page,
                         "source": basename,  # filepath 대신 basename 사용
@@ -259,105 +223,3 @@ class ReconstructElementsNode(BaseNode):
                 reconstructed_elements[elem.page]["text"] += elem.content
 
         return {"reconstructed_elements": reconstructed_elements}
-
-
-class LangChainDocumentNode(BaseNode):
-    def __init__(self, splitter, verbose=False, use_relative_path=True, language="ko", domain_type="academic"):
-        super().__init__(verbose)
-        self.splitter = splitter
-        self.use_relative_path = use_relative_path
-        self.language = language
-        self.domain_type = domain_type
-
-    def _get_relative_path(self, image_path):
-        """이미지 경로를 상대 경로로 변환합니다.
-
-        ExportImage에서 생성한 상대 경로 형식을 그대로 사용합니다.
-        이미 상대 경로인 경우 그대로 사용하고, 절대 경로인 경우 상대 경로로 변환합니다.
-        """
-        if not image_path or not self.use_relative_path:
-            return image_path
-
-        # 파일 경로가 file:// 프로토콜을 사용하는 경우 제거
-        if image_path.startswith("file:///"):
-            image_path = image_path[7:]  # 'file:///' 제거
-        elif image_path.startswith("file://"):
-            image_path = image_path[6:]  # 'file://' 제거
-
-        # 이미 상대 경로인 경우 (./images/ 또는 images/ 로 시작하는 경우)
-        if image_path.startswith("./images/") or image_path.startswith("images/"):
-            return image_path
-
-        # 절대 경로에서 이미지 파일명 추출
-        basename = os.path.basename(image_path)
-
-        # 파일명으로부터 카테고리 추출
-        # 예: 2210.03629v3_FIGURE_Page_1_Index_13.png
-        # 또는 {BASE_PREFIX}_{CATEGORY}_Page_{PAGE}_Index_{INDEX}.png
-        parts = basename.split("_")
-        if len(parts) >= 2:
-            category_part = parts[1].lower()
-            # 알려진 카테고리 중 하나인지 확인
-            if category_part in ["figure", "chart", "table"]:
-                category = category_part
-            else:
-                # 기본값은 figure
-                category = "figure"
-        else:
-            # 파일명에서 카테고리를 추출할 수 없는 경우 기본값 사용
-            category = "figure"
-
-        # ExportImage에서 생성하는 상대 경로 형식과 동일하게 생성
-        # 형식: "./images/{category}/{basename}"
-        rel_path = os.path.join(".", "images", category, basename)
-        rel_path = rel_path.replace("\\", "/")  # 경로 구분자 통일
-
-        return rel_path
-
-    def execute(self, state: ParseState) -> ParseState:
-        reconstructed_elements = state["reconstructed_elements"]
-        filepath = state["filepath"]
-        # 파일 경로에서 basename만 추출하여 source로 사용
-        basename = os.path.basename(filepath)
-        documents = []
-        for page_num, page_data in reconstructed_elements.items():
-            text = page_data["text"]
-            split_texts = self.splitter.split_text(text)
-            for split_text in split_texts:
-                documents.append(
-                    Document(
-                        page_content=split_text,
-                        metadata={"page": page_num, "source": basename},
-                    )
-                )
-            images = page_data["image"]
-            for image in images:
-                # 이미지 메타데이터의 image 경로를 상대 경로로 변환
-                metadata = image["metadata"].copy()
-                if "image" in metadata:
-                    metadata["image"] = self._get_relative_path(metadata["image"])
-                # source도 basename으로 변경
-                if "source" in metadata:
-                    metadata["source"] = basename
-
-                documents.append(
-                    Document(page_content=image["content"], metadata=metadata)
-                )
-            tables = page_data["table"]
-            for table in tables:
-                # 테이블 메타데이터의 source도 basename으로 변경
-                metadata = table["metadata"].copy()
-                if "source" in metadata:
-                    metadata["source"] = basename
-
-                documents.append(
-                    Document(page_content=table["content"], metadata=metadata)
-                )
-                documents.append(
-                    Document(
-                        page_content=metadata["entity"],
-                        metadata=metadata,
-                    )
-                )
-
-        return {"documents": documents}

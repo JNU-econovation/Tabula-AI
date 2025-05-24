@@ -14,19 +14,16 @@ from note_sdk.parsing.preprocessing import (
     MergeEntityNode,
     ReconstructElementsNode
 )
-from note_sdk.parsing.export import  ExportMarkdown, ExportTableCSV, ExportImage
+from note_sdk.parsing.export import ExportMarkdown, ExportImage
 from note_sdk.parsing.extractor import (
     PageElementsExtractorNode,
     ImageEntityExtractorNode,
-    TableEntityExtractorNode,
 )
 
 """
 문서 파싱 그래프 생성 및 관리
 """
-
 def create_document_parse_graph(
-    filepath: str,
     output_dir: str,
     language: str,
     domain_type: str,
@@ -76,7 +73,6 @@ def create_document_parse_graph(
     # 후처리 노드들 생성
     create_elements_node = CreateElementsNode(verbose=verbose)
     export_markdown = ExportMarkdown(verbose=verbose)
-    export_table_csv = ExportTableCSV(verbose=verbose)
     export_image = ExportImage(verbose=verbose)
     page_elements_extractor_node = PageElementsExtractorNode(verbose=verbose)
     image_entity_extractor_node = ImageEntityExtractorNode(
@@ -84,19 +80,8 @@ def create_document_parse_graph(
         language=language,
         domain_type=domain_type
     )
-    table_entity_extractor_node = TableEntityExtractorNode(
-        verbose=verbose,
-        language=language,
-        domain_type=domain_type
-    )
     merge_entity_node = MergeEntityNode(verbose=verbose)
     reconstruct_elements_node = ReconstructElementsNode(verbose=verbose)
-    # langchain_document_node = LangChainDocumentNode(
-    #     verbose=verbose,
-    #     splitter=RecursiveCharacterTextSplitter(chunk_size=1000, chunk_overlap=0),
-    #     language=language,
-    #     domain_type=domain_type
-    # )
 
     # 후처리 워크플로우 생성
     post_process_workflow = StateGraph(ParseState)
@@ -106,43 +91,28 @@ def create_document_parse_graph(
     post_process_workflow.add_node("create_elements_node", create_elements_node)
     post_process_workflow.add_node("export_image", export_image)
     post_process_workflow.add_node("export_markdown", export_markdown)
-    post_process_workflow.add_node("export_table_csv", export_table_csv)
     post_process_workflow.add_node(
         "page_elements_extractor_node", page_elements_extractor_node
     )
     post_process_workflow.add_node(
         "image_entity_extractor_node", image_entity_extractor_node
     )
-    post_process_workflow.add_node(
-        "table_entity_extractor_node", table_entity_extractor_node
-    )
     post_process_workflow.add_node("merge_entity_node", merge_entity_node)
     post_process_workflow.add_node(
         "reconstruct_elements_node", reconstruct_elements_node
     )
-    # post_process_workflow.add_node("langchain_document_node", langchain_document_node)
 
     # 엣지 연결
     post_process_workflow.add_edge("document_parse", "create_elements_node")
     post_process_workflow.add_edge("create_elements_node", "export_image")
     post_process_workflow.add_edge("export_image", "export_markdown")
-    post_process_workflow.add_edge("export_image", "export_table_csv")
     post_process_workflow.add_edge("export_image", "page_elements_extractor_node")
     post_process_workflow.add_edge(
         "page_elements_extractor_node", "image_entity_extractor_node"
     )
-    post_process_workflow.add_edge(
-        "page_elements_extractor_node", "table_entity_extractor_node"
-    )
     post_process_workflow.add_edge("image_entity_extractor_node", "merge_entity_node")
     post_process_workflow.add_edge("export_markdown", END)
-    post_process_workflow.add_edge("export_table_csv", END)
-    post_process_workflow.add_edge("table_entity_extractor_node", "merge_entity_node")
     post_process_workflow.add_edge("merge_entity_node", "reconstruct_elements_node")
-    # post_process_workflow.add_edge(
-    #     "reconstruct_elements_node", "langchain_document_node"
-    # )
-    # post_process_workflow.add_edge("langchain_document_node", END)
     post_process_workflow.add_edge("reconstruct_elements_node", END)
 
     post_process_workflow.set_entry_point("document_parse")
