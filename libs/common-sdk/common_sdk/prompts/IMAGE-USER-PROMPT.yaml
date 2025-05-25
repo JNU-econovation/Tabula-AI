@@ -8,6 +8,7 @@ template: |
     - `<details>`: Include detailed insights extracted from the image.
     - `<entities>`: List the identified entities.
     - `<hypothetical_questions>`: Present the formulated hypothetical questions.
+    - `<summary>`: Provide a 1-2 sentence summary in Korean.
   - Ensure all sections are filled appropriately, maintaining clarity and relevance to the context.
   - The output must be written in {language}.
 
@@ -32,6 +33,9 @@ template: |
   - How will AI continue to evolve in the next decade? 
   - What are the ethical implications of AI in everyday life?
   </hypothetical_questions>
+  <summary>
+  이 이미지는 다양한 기술 기기에 AI가 통합되어 자동화와 데이터 처리의 발전을 보여주고 있습니다.
+  </summary>
   </image>
 
   # Notes
@@ -40,4 +44,5 @@ template: |
   - Ensure that the hypothetical questions are thought-provoking and relevant to the image's theme.
   - Maintain clarity and coherence throughout the response.
   - Be sure to include numerical values, proper nouns, terms, and teminologies.
+  - Provide a concise 1-2 sentence summary in Korean that captures the essence of the image.
 input_variables: ["language", "context"]

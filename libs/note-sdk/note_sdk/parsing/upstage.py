@@ -22,15 +22,13 @@ DEFAULT_CONFIG = {
     "base64_encoding": "['figure', 'chart']",
 }
 
-
+# 문서 파싱 노드
 class DocumentParseNode(BaseNode):
     def __init__(self, use_ocr=False, verbose=False, output_dir="result", **kwargs):
         """
-        DocumentParse 클래스의 생성자
-
-        :param use_ocr: OCR 사용 여부
-        :param verbose: 상세 로그 출력 여부
-        :param output_dir: 출력 디렉토리 경로
+        param use_ocr: OCR 사용 여부
+        param verbose: 상세 로그 출력 여부
+        param output_dir: 출력 디렉토리 경로
         """
         super().__init__(verbose=verbose, **kwargs)
         self.api_key = common_settings.UPSTAGE_API_KEY
@@ -43,7 +41,7 @@ class DocumentParseNode(BaseNode):
         self.output_dir = output_dir
         self.temp_dir = None
 
-    def upstage_layout_analysis(self, input_file):
+    def upstage_layout_analysis(self, input_file, task_id):
         """
         Upstage의 Document Parse API를 호출하여 문서 분석을 수행합니다.
 
@@ -51,15 +49,8 @@ class DocumentParseNode(BaseNode):
         :return: 분석 결과가 저장된 JSON 파일의 경로
         """
         try:
-            # 임시 디렉토리 생성 - settings.get_temp_dir() 사용
-            document_id = os.path.splitext(os.path.basename(input_file))[0]
-            self.temp_dir = settings.get_temp_dir(document_id)
-            
-            # 이미 존재하는 디렉토리인 경우 정리
-            if os.path.exists(self.temp_dir):
-                shutil.rmtree(self.temp_dir)
-            
-            # 새로운 임시 디렉토리 생성
+            # settings.get_temp_dir() 사용
+            self.temp_dir = settings.get_temp_dir(task_id)
             os.makedirs(self.temp_dir, exist_ok=True)
             logger.info(f"임시 디렉토리 생성: {self.temp_dir}")
 
@@ -79,15 +70,12 @@ class DocumentParseNode(BaseNode):
 
             # API 응답 처리 및 결과 저장
             if response.status_code == 200:
-                # 분석 결과를 메모리에 저장
                 result = response.json()
                 return result
             else:
-                # API 요청이 실패한 경우 예외 발생
                 logger.error(f"API request failed. Status code: {response.status_code}")
                 raise ValueError()
         finally:
-            # 파일 핸들 닫기
             if 'files' in locals():
                 files['document'].close()
 
@@ -128,21 +116,21 @@ class DocumentParseNode(BaseNode):
             return (-1, -1)
 
     def execute(self, state: ParseState):
-        if "filepath" not in state:
-            raise ValueError("filepath is required in state")
+        if "task_id" not in state:
+            raise ValueError("task_id is required in state")
         
         start_time = time.time()
         logger.info(f"Start Parsing: {state['working_filepath']}")
 
         try:
             filepath = state["working_filepath"]
-            parsed_json = self.upstage_layout_analysis(filepath)
+            task_id = state["task_id"]
+            parsed_json = self.upstage_layout_analysis(filepath, task_id)
 
             # 파일명에서 시작 페이지 추출
             start_page, _ = self.parse_start_end_page(filepath)
             page_offset = start_page - 1 if start_page != -1 else 0
 
-            # parsed_json이 이미 딕셔너리이므로 파일로 읽을 필요 없음
             data = parsed_json
 
             # 페이지 번호와 ID 재계산
@@ -161,8 +149,8 @@ class DocumentParseNode(BaseNode):
             return {
                 "metadata": [metadata],
                 "raw_elements": [data["elements"]],
-                "filepath": state["filepath"],  # filepath 유지
-                "temp_dir": self.temp_dir  # temp 디렉토리 경로 추가
+                "temp_dir": self.temp_dir,
+                "task_id": task_id
             }
         except Exception as e:
             logger.error(f"파싱 중 오류 발생: {str(e)}")

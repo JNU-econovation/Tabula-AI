@@ -1,5 +1,5 @@
 import operator
-from typing import TypedDict, Annotated, List, Dict
+from typing import TypedDict, Annotated, List, Dict, Optional
 from note_sdk.parsing.element import Element
 from langchain_core.documents import Document
 
@@ -7,7 +7,8 @@ from langchain_core.documents import Document
 파싱 상태 클래스 정의
 """
 class ParseState(TypedDict):
-    filepath: Annotated[str, "filepath"]  # 원본 파일 경로
+    task_id: Annotated[str, "task_id"]  # 작업 ID
+    filepath: Annotated[Optional[str], "filepath"]  # 원본 파일 경로 (선택적)
     filetype: Annotated[
         str, "filetype"
     ]  # 파일 타입(PDF, DOCX, PPTX, XLSX) / 현재 PDF만 지원

@@ -8,7 +8,7 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-tabula-common-sdk = { path = "../../libs/common-sdk", develop = true }
+tabula-common-sdk = { path = "../../libs/common-sdk", develop = true, extras = ["all"] }
 langchain = ">=0.3.20"
 langchain-core = ">=0.3.43"
 langchain-openai = ">=0.3.8"

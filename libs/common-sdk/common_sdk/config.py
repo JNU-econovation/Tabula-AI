@@ -40,6 +40,9 @@ class Settings:
     AWS_REGION = os.getenv("AWS_REGION")
     S3_BUCKET = os.getenv("S3_BUCKET")
 
+    # JWT
+    JWT_SECRET = os.getenv("JWT_SECRET")
+
     # Path setting
     LOG_PATH = os.getenv("LOG_PATH", os.path.join(PROJECT_ROOT, "logs"))
     LOG_PATH = Path(LOG_PATH)

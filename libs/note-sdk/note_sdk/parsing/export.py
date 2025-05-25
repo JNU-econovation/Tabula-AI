@@ -16,16 +16,13 @@ class ExportImage(BaseNode):
         super().__init__(verbose=verbose, **kwargs)
         self.use_relative_path = use_relative_path
 
-    def save_to_png(self, base64_encoding, dirname, basename, category, page, index):
-        # document_id 추출
-        document_id = os.path.splitext(basename)[0]
-        
-        # settings.RESULT_DIR 사용
-        image_dir = os.path.join(settings.RESULT_DIR, "images", document_id)
+    def save_to_png(self, base64_encoding, task_id, page, index):
+        # settings.get_image_dir() 사용
+        image_dir = settings.get_image_dir(task_id)
         os.makedirs(image_dir, exist_ok=True)
 
-        # 이미지 파일명을 document_id_Page_X_Index_Y.png 형식으로 생성
-        image_filename = f"{document_id}_Page_{page}_Index_{index}.png"
+        # 이미지 파일명 생성
+        image_filename = f"image_{page}_{index}.png"
         image_path = os.path.join(image_dir, image_filename)
 
         # base64 디코딩 및 이미지 저장
@@ -33,13 +30,10 @@ class ExportImage(BaseNode):
         with open(image_path, "wb") as f:
             f.write(image_data)
 
-        # 상대 경로 반환 (md 파일 기준)
-        return f"../images/{document_id}/{image_filename}"
+        return image_path
 
     def execute(self, state: ParseState):
-        filepath = state["filepath"]
-        basename = os.path.basename(filepath)
-        document_id = os.path.splitext(basename)[0]
+        task_id = state["task_id"]
 
         for elem in state["elements_from_parser"]:
             if elem["category"] in ["figure", "chart"]:
@@ -47,9 +41,7 @@ class ExportImage(BaseNode):
                 if base64_encoding:
                     image_path = self.save_to_png(
                         base64_encoding,
-                        "result",
-                        basename,
-                        elem["category"],
+                        task_id,
                         elem["page"],
                         elem["id"],
                     )
@@ -74,16 +66,13 @@ class ExportMarkdown(BaseNode):
         self.separator = "\n\n"
 
     def execute(self, state: ParseState):
-        filepath = state["filepath"]
-        basename = os.path.basename(filepath)
-        document_id = os.path.splitext(basename)[0]
+        task_id = state["task_id"]
+        document_id = os.path.splitext(os.path.basename(state["filepath"]))[0]
 
-        md_dir = os.path.join(settings.RESULT_DIR, "md")
-        os.makedirs(md_dir, exist_ok=True)
+        md_path = settings.get_markdown_path(task_id, document_id)
+        os.makedirs(md_path.parent, exist_ok=True)
 
-        md_filepath = os.path.join(md_dir, f"{document_id}.md")
-
-        with open(md_filepath, "w", encoding="utf-8") as f:
+        with open(md_path, "w", encoding="utf-8") as f:
             for elem in state["elements_from_parser"]:
                 if elem["category"] in ["header", "footer", "footnote"]:
                     continue
@@ -100,5 +89,5 @@ class ExportMarkdown(BaseNode):
                 else:
                     f.write(elem["content"]["markdown"] + self.separator)
 
-        logger.info(f"Markdown file successfully created: {md_filepath}")
-        return {"export": [md_filepath]}
+        logger.info(f"Markdown file successfully created: {md_path}")
+        return {"export": [str(md_path)]}

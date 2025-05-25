@@ -14,22 +14,25 @@ from note_sdk.llm import MultiModal, LLMs
 from langchain_openai import ChatOpenAI
 from common_sdk.utils import num_tokens_from_string
 from common_sdk.get_logger import get_logger
+from common_sdk.prompt_loader import PromptLoader
 
 logger = get_logger()
 
 # 이미지 요약 클래스
 class ImageSummary:
-    def __init__(self):
-
+    def __init__(self, task_id: str = None):
         # OpenAI 클라이언트 초기화
         self.client = OpenAI(api_key=common_settings.OPENAI_API_KEY_J)
-        self.image_base_path = str(settings.get_result_dir(""))
+
+        # 경로 설정
+        self.image_base_path = settings.get_image_dir(task_id)
+        
+        # 프롬프트 로더 초기화
+        self.prompt_loader = PromptLoader()
         
         # 프롬프트 로드
-        self.image_system_prompt = self.load_prompt(os.path.join(common_settings.PROMPT_BASE_PATH, "IMAGE-SYSTEM-PROMPT.yaml"))
-        loaded_image_user_prompt = self.load_prompt(os.path.join(common_settings.PROMPT_BASE_PATH, "IMAGE-USER-PROMPT.yaml"))
-        # 사용자 프롬프트에 1-2줄 요약 및 한글 요약 지시 추가
-        self.image_user_prompt = loaded_image_user_prompt + "\n\nSummarize the image in 1-2 sentences. Please provide the summary in Korean."
+        self.image_system_prompt = self.prompt_loader.load_prompt("image-system-prompt")["template"]
+        self.image_user_prompt = self.prompt_loader.load_prompt("image-user-prompt")["template"]
 
         # 토큰 수 계산 및 출력
         self.system_tokens = num_tokens_from_string(self.image_system_prompt)
@@ -52,16 +55,6 @@ class ImageSummary:
 
         # 이미지 처리 결과 저장을 위한 변수 추가
         self.processed_images = []
-
-    def load_prompt(self, prompt_path: str) -> str:
-        """프롬프트 파일 로드"""
-        try:
-            with open(prompt_path, 'r', encoding='utf-8') as f:
-                prompt = yaml.safe_load(f)
-                return prompt.get('prompt', '')
-        except Exception as e:
-            logger.error(f"Prompt loading failed: {str(e)}")
-            return ""
 
     def resize_image(self, image_path: str, max_size: int = 1024) -> bytes:
         """이미지 크기 조정"""
@@ -133,7 +126,10 @@ class ImageSummary:
             summary = self.image_model.invoke(
                 actual_image_path,
                 system_prompt=self.image_system_prompt,
-                user_prompt=f"{self.image_user_prompt}\n\nImage Context in Markdown:\n{image_info['context']}"
+                user_prompt=self.image_user_prompt.format(
+                    language="Korean",
+                    context=image_info['context']
+                )
             )
             
             # 요약 토큰 수 계산 및 누적
@@ -199,12 +195,12 @@ class ImageSummary:
                     await asyncio.sleep(3)
             
             # 전체 토큰 수 출력
-            print("\n=== 전체 토큰 사용량 ===")
-            print(f"시스템 프롬프트: {self.system_tokens} 토큰")
-            print(f"사용자 프롬프트: {self.user_tokens} 토큰")
-            print(f"총 컨텍스트: {self.total_context_tokens} 토큰")
-            print(f"총 요약: {self.total_summary_tokens} 토큰")
-            print(f"총 토큰 수: {self.total_prompt_tokens + self.total_context_tokens + self.total_summary_tokens} 토큰")
+            logger.info("\n=== 전체 토큰 사용량 ===")
+            logger.info(f"시스템 프롬프트: {self.system_tokens} 토큰")
+            logger.info(f"사용자 프롬프트: {self.user_tokens} 토큰")
+            logger.info(f"총 컨텍스트: {self.total_context_tokens} 토큰")
+            logger.info(f"총 요약: {self.total_summary_tokens} 토큰")
+            logger.info(f"총 토큰 수: {self.total_prompt_tokens + self.total_context_tokens + self.total_summary_tokens} 토큰")
             
             return {
                 "document_id": document_id,

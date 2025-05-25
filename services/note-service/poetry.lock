@@ -100,34 +100,34 @@ lxml = ["lxml"]
 
 [[package]]
 name = "boto3"
-version = "1.38.21"
+version = "1.38.23"
 description = "The AWS SDK for Python"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "boto3-1.38.21-py3-none-any.whl", hash = "sha256:37e4b6b7f77f4cc476ea82eb76a502a289bb750eee96f7d07ec9bcec6592191a"},
-    {file = "boto3-1.38.21.tar.gz", hash = "sha256:417d0328fd3394ffb1c1f400d4277d45b0b86f48d2f088a02306474969344a47"},
+    {file = "boto3-1.38.23-py3-none-any.whl", hash = "sha256:70ab8364f1f6f0a7e0eaf97f62fbdacf9c1e4cc1de330faf1c146ef9ab01e7d0"},
+    {file = "boto3-1.38.23.tar.gz", hash = "sha256:bcf73aca469add09e165b8793be18e7578db8d2604d82505ab13dc2495bad982"},
 ]
 
 [package.dependencies]
-botocore = ">=1.38.21,<1.39.0"
+botocore = ">=1.38.23,<1.39.0"
 jmespath = ">=0.7.1,<2.0.0"
-s3transfer = ">=0.12.0,<0.13.0"
+s3transfer = ">=0.13.0,<0.14.0"
 
 [package.extras]
 crt = ["botocore[crt] (>=1.21.0,<2.0a0)"]
 
 [[package]]
 name = "botocore"
-version = "1.38.21"
+version = "1.38.23"
 description = "Low-level, data-driven core of boto 3."
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "botocore-1.38.21-py3-none-any.whl", hash = "sha256:567b4d338114174d0b41857002a4b1e8efb68f1654ed9f3ec6c34ebdef5e9eaf"},
-    {file = "botocore-1.38.21.tar.gz", hash = "sha256:08d5e9c00e5cc9e0ae0e60570846011789dc7f1d4ea094b3f3e3f3ae1ff2063a"},
+    {file = "botocore-1.38.23-py3-none-any.whl", hash = "sha256:a7f818672f10d7a080c2c4558428011c3e0abc1039a047d27ac76ec846158457"},
+    {file = "botocore-1.38.23.tar.gz", hash = "sha256:29685c91050a870c3809238dc5da1ac65a48a3a20b4bca46b6057dcb6b39c72a"},
 ]
 
 [package.dependencies]
@@ -355,7 +355,7 @@ description = "Cross-platform colored terminal text."
 optional = false
 python-versions = "!=3.0.*,!=3.1.*,!=3.2.*,!=3.3.*,!=3.4.*,!=3.5.*,!=3.6.*,>=2.7"
 groups = ["main"]
-markers = "sys_platform == \"win32\" or platform_system == \"Windows\""
+markers = "platform_system == \"Windows\" or sys_platform == \"win32\""
 files = [
     {file = "colorama-0.4.6-py2.py3-none-any.whl", hash = "sha256:4f1d9991f5acc0ca119f9d443620b77f9d6b33703e51011c16baf57afb285fc6"},
     {file = "colorama-0.4.6.tar.gz", hash = "sha256:08695f5cb7ed6e0531a20572697297273c47b8cae5a63ffc6d6ed5c201be6e44"},
@@ -439,6 +439,27 @@ files = [
 
 [package.extras]
 tests = ["asttokens (>=2.1.0)", "coverage", "coverage-enable-subprocess", "ipython", "littleutils", "pytest", "rich ; python_version >= \"3.11\""]
+
+[[package]]
+name = "fastapi"
+version = "0.115.12"
+description = "FastAPI framework, high performance, easy to learn, fast to code, ready for production"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "fastapi-0.115.12-py3-none-any.whl", hash = "sha256:e94613d6c05e27be7ffebdd6ea5f388112e5e430c8f7d6494a9d1d88d43e814d"},
+    {file = "fastapi-0.115.12.tar.gz", hash = "sha256:1e2c2a2646905f9e83d32f04a3f86aff4a286669c6c950ca95b5fd68c2602681"},
+]
+
+[package.dependencies]
+pydantic = ">=1.7.4,<1.8 || >1.8,<1.8.1 || >1.8.1,<2.0.0 || >2.0.0,<2.0.1 || >2.0.1,<2.1.0 || >2.1.0,<3.0.0"
+starlette = ">=0.40.0,<0.47.0"
+typing-extensions = ">=4.8.0"
+
+[package.extras]
+all = ["email-validator (>=2.0.0)", "fastapi-cli[standard] (>=0.0.5)", "httpx (>=0.23.0)", "itsdangerous (>=1.1.0)", "jinja2 (>=3.1.5)", "orjson (>=3.2.1)", "pydantic-extra-types (>=2.0.0)", "pydantic-settings (>=2.0.0)", "python-multipart (>=0.0.18)", "pyyaml (>=5.3.1)", "ujson (>=4.0.1,!=4.0.2,!=4.1.0,!=4.2.0,!=4.3.0,!=5.0.0,!=5.1.0)", "uvicorn[standard] (>=0.12.0)"]
+standard = ["email-validator (>=2.0.0)", "fastapi-cli[standard] (>=0.0.5)", "httpx (>=0.23.0)", "jinja2 (>=3.1.5)", "python-multipart (>=0.0.18)", "uvicorn[standard] (>=0.12.0)"]
 
 [[package]]
 name = "greenlet"
@@ -765,14 +786,14 @@ files = [
 
 [[package]]
 name = "joblib"
-version = "1.5.0"
+version = "1.5.1"
 description = "Lightweight pipelining with Python functions"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "joblib-1.5.0-py3-none-any.whl", hash = "sha256:206144b320246485b712fc8cc51f017de58225fa8b414a1fe1764a7231aca491"},
-    {file = "joblib-1.5.0.tar.gz", hash = "sha256:d8757f955389a3dd7a23152e43bc297c2e0c2d3060056dad0feefc88a06939b5"},
+    {file = "joblib-1.5.1-py3-none-any.whl", hash = "sha256:4719a31f054c7d766948dcd83e9613686b27114f190f717cec7eaa2084f8a74a"},
+    {file = "joblib-1.5.1.tar.gz", hash = "sha256:f4f86e351f39fe3d0d32a9f2c3d8af1ee4cec285aafcb27003dda5205576b444"},
 ]
 
 [[package]]
@@ -844,14 +865,14 @@ xai = ["langchain-xai"]
 
 [[package]]
 name = "langchain-core"
-version = "0.3.60"
+version = "0.3.61"
 description = "Building applications with LLMs through composability"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "langchain_core-0.3.60-py3-none-any.whl", hash = "sha256:2ccdf06b12e699b1b0962bc02837056c075b4981c3d13f82a4d4c30bb22ea3dc"},
-    {file = "langchain_core-0.3.60.tar.gz", hash = "sha256:63dd1bdf7939816115399522661ca85a2f3686a61440f2f46ebd86d1b028595b"},
+    {file = "langchain_core-0.3.61-py3-none-any.whl", hash = "sha256:62cddbda7fb6085b6096bb4f3ad69642ebb0585bde7b210edc61dd0af33f2ea4"},
+    {file = "langchain_core-0.3.61.tar.gz", hash = "sha256:67ba08d4cf58616050047ef3a07887a72607fea9b6b4522dff9e7579a1adbe75"},
 ]
 
 [package.dependencies]
@@ -865,18 +886,18 @@ typing-extensions = ">=4.7"
 
 [[package]]
 name = "langchain-openai"
-version = "0.3.17"
+version = "0.3.18"
 description = "An integration package connecting OpenAI and LangChain"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "langchain_openai-0.3.17-py3-none-any.whl", hash = "sha256:d4d9cf945e2453ee5895ccd12fd8a3ea9131a0f6130dcc21427c77cc2206b1c0"},
-    {file = "langchain_openai-0.3.17.tar.gz", hash = "sha256:10bcdfac3edb3dea4a8aabb12f01566e5ff8756634cc52aa169c62e4c4b73801"},
+    {file = "langchain_openai-0.3.18-py3-none-any.whl", hash = "sha256:1687b972a6f6ac125cb8b23c0043278ab3bce031983ef9b32c1277155f88a03e"},
+    {file = "langchain_openai-0.3.18.tar.gz", hash = "sha256:8e0769e4042de099a6217bbdccf7cc06b14c462e900424cbfc340c5f46f079ba"},
 ]
 
 [package.dependencies]
-langchain-core = ">=0.3.59,<1.0.0"
+langchain-core = ">=0.3.61,<1.0.0"
 openai = ">=1.68.2,<2.0.0"
 tiktoken = ">=0.7,<1"
 
@@ -897,23 +918,23 @@ langchain-core = ">=0.3.51,<1.0.0"
 
 [[package]]
 name = "langgraph"
-version = "0.4.5"
+version = "0.4.7"
 description = "Building stateful, multi-actor applications with LLMs"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "langgraph-0.4.5-py3-none-any.whl", hash = "sha256:73f36caae55137c2bdb2a6c59661f0ae29c1516a0d1f4ad4975ad3862865a979"},
-    {file = "langgraph-0.4.5.tar.gz", hash = "sha256:08a8c6577b09cda4e0c16712e762927f00930dabbc7fe235562985ad85891349"},
+    {file = "langgraph-0.4.7-py3-none-any.whl", hash = "sha256:a925a3881fcd631eccf076994f41012e9320cd1adacc9aeb89ffcb3442b61f86"},
+    {file = "langgraph-0.4.7.tar.gz", hash = "sha256:8948a35f6f85805c8ac36e94d5492c86a34c39dcf6f405b0f84491bc444e3479"},
 ]
 
 [package.dependencies]
-langchain-core = {version = ">=0.1", markers = "python_version < \"4.0\""}
-langgraph-checkpoint = ">=2.0.26,<3.0.0"
-langgraph-prebuilt = {version = ">=0.1.8", markers = "python_version < \"4.0\""}
-langgraph-sdk = {version = ">=0.1.42", markers = "python_version < \"4.0\""}
+langchain-core = ">=0.1"
+langgraph-checkpoint = ">=2.0.26"
+langgraph-prebuilt = ">=0.2.0"
+langgraph-sdk = ">=0.1.42"
 pydantic = ">=2.7.4"
-xxhash = ">=3.5.0,<4.0.0"
+xxhash = ">=3.5.0"
 
 [[package]]
 name = "langgraph-checkpoint"
@@ -933,19 +954,19 @@ ormsgpack = ">=1.8.0,<2.0.0"
 
 [[package]]
 name = "langgraph-prebuilt"
-version = "0.1.8"
+version = "0.2.1"
 description = "Library with high-level APIs for creating and executing LangGraph agents and tools."
 optional = false
-python-versions = "<4.0.0,>=3.9.0"
+python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "langgraph_prebuilt-0.1.8-py3-none-any.whl", hash = "sha256:ae97b828ae00be2cefec503423aa782e1bff165e9b94592e224da132f2526968"},
-    {file = "langgraph_prebuilt-0.1.8.tar.gz", hash = "sha256:4de7659151829b2b955b6798df6800e580e617782c15c2c5b29b139697491831"},
+    {file = "langgraph_prebuilt-0.2.1-py3-none-any.whl", hash = "sha256:55e1a4f8d54a4b1fdda9f8300af9891da23808a43aba72e381aebebf7e51326c"},
+    {file = "langgraph_prebuilt-0.2.1.tar.gz", hash = "sha256:3bdc2054cab54c2fd81f334974568316977ac96b678d5a3d95bf443aef6507d5"},
 ]
 
 [package.dependencies]
-langchain-core = ">=0.2.43,<0.3.0 || >0.3.0,<0.3.1 || >0.3.1,<0.3.2 || >0.3.2,<0.3.3 || >0.3.3,<0.3.4 || >0.3.4,<0.3.5 || >0.3.5,<0.3.6 || >0.3.6,<0.3.7 || >0.3.7,<0.3.8 || >0.3.8,<0.3.9 || >0.3.9,<0.3.10 || >0.3.10,<0.3.11 || >0.3.11,<0.3.12 || >0.3.12,<0.3.13 || >0.3.13,<0.3.14 || >0.3.14,<0.3.15 || >0.3.15,<0.3.16 || >0.3.16,<0.3.17 || >0.3.17,<0.3.18 || >0.3.18,<0.3.19 || >0.3.19,<0.3.20 || >0.3.20,<0.3.21 || >0.3.21,<0.3.22 || >0.3.22,<0.4.0"
-langgraph-checkpoint = ">=2.0.10,<3.0.0"
+langchain-core = ">=0.3.22"
+langgraph-checkpoint = ">=2.0.10"
 
 [[package]]
 name = "langgraph-sdk"
@@ -1346,14 +1367,14 @@ files = [
 
 [[package]]
 name = "openai"
-version = "1.81.0"
+version = "1.82.0"
 description = "The official Python library for the openai API"
 optional = false
 python-versions = ">=3.8"
 groups = ["main"]
 files = [
-    {file = "openai-1.81.0-py3-none-any.whl", hash = "sha256:1c71572e22b43876c5d7d65ade0b7b516bb527c3d44ae94111267a09125f7bae"},
-    {file = "openai-1.81.0.tar.gz", hash = "sha256:349567a8607e0bcffd28e02f96b5c2397d0d25d06732d90ab3ecbf97abf030f9"},
+    {file = "openai-1.82.0-py3-none-any.whl", hash = "sha256:8c40647fea1816516cb3de5189775b30b5f4812777e40b8768f361f232b61b30"},
+    {file = "openai-1.82.0.tar.gz", hash = "sha256:b0a009b9a58662d598d07e91e4219ab4b1e3d8ba2db3f173896a92b9b874d1a7"},
 ]
 
 [package.dependencies]
@@ -1887,14 +1908,14 @@ files = [
 
 [[package]]
 name = "pydantic"
-version = "2.11.4"
+version = "2.11.5"
 description = "Data validation using Python type hints"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "pydantic-2.11.4-py3-none-any.whl", hash = "sha256:d9615eaa9ac5a063471da949c8fc16376a84afb5024688b3ff885693506764eb"},
-    {file = "pydantic-2.11.4.tar.gz", hash = "sha256:32738d19d63a226a52eed76645a98ee07c1f410ee41d93b4afbfa85ed8111c2d"},
+    {file = "pydantic-2.11.5-py3-none-any.whl", hash = "sha256:f9c26ba06f9747749ca1e5c94d6a85cb84254577553c8785576fd38fa64dc0f7"},
+    {file = "pydantic-2.11.5.tar.gz", hash = "sha256:7f853db3d0ce78ce8bbb148c401c2cdd6431b3473c0cdff2755c7690952a7b7a"},
 ]
 
 [package.dependencies]
@@ -2116,20 +2137,20 @@ zstd = ["zstandard"]
 
 [[package]]
 name = "pymupdf"
-version = "1.25.5"
+version = "1.26.0"
 description = "A high performance Python library for data extraction, analysis, conversion & manipulation of PDF (and other) documents."
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "pymupdf-1.25.5-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:cde4e1c9cfb09c0e1e9c2b7f4b787dd6bb34a32cfe141a4675e24af7c0c25dd3"},
-    {file = "pymupdf-1.25.5-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:5a35e2725fae0ab57f058dff77615c15eb5961eac50ba04f41ebc792cd8facad"},
-    {file = "pymupdf-1.25.5-cp39-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:d94b800e9501929c42283d39bc241001dd87fdeea297b5cb40d5b5714534452f"},
-    {file = "pymupdf-1.25.5-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:ee22155d3a634642d76553204867d862ae1bdd9f7cf70c0797d8127ebee6bed5"},
-    {file = "pymupdf-1.25.5-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:6ed7fc25271004d6d3279c20a80cb2bb4cda3efa9f9088dcc07cd790eca0bc63"},
-    {file = "pymupdf-1.25.5-cp39-abi3-win32.whl", hash = "sha256:65e18ddb37fe8ec4edcdbebe9be3a8486b6a2f42609d0a142677e42f3a0614f8"},
-    {file = "pymupdf-1.25.5-cp39-abi3-win_amd64.whl", hash = "sha256:7f44bc3d03ea45b2f68c96464f96105e8c7908896f2fb5e8c04f1fb8dae7981e"},
-    {file = "pymupdf-1.25.5.tar.gz", hash = "sha256:5f96311cacd13254c905f6654a004a0a2025b71cabc04fda667f5472f72c15a0"},
+    {file = "pymupdf-1.26.0-cp39-abi3-macosx_10_9_x86_64.whl", hash = "sha256:86195673a5f2b3fbf0f75c73c40975a893fc42bf3d5c2a7cce9fb160704d9997"},
+    {file = "pymupdf-1.26.0-cp39-abi3-macosx_11_0_arm64.whl", hash = "sha256:26c5df128a0ed7c38b80a1e7ddd792dd4d8b264839b6b8b6b6b768b13c0bb60e"},
+    {file = "pymupdf-1.26.0-cp39-abi3-manylinux2014_aarch64.manylinux_2_17_aarch64.whl", hash = "sha256:84a4dc96144a6bdf13f7d78c21500b3d1bef14d658156afd479acb3995f650c3"},
+    {file = "pymupdf-1.26.0-cp39-abi3-manylinux2014_x86_64.manylinux_2_17_x86_64.whl", hash = "sha256:a3f6a45fcf8177763a2629a2ab2cad326e8950a0d120b174b56369365355a2a7"},
+    {file = "pymupdf-1.26.0-cp39-abi3-musllinux_1_2_x86_64.whl", hash = "sha256:b5d4751696ba888ab1a91c6a0208c5d31724ee0bebe406f7a83067a08214f88b"},
+    {file = "pymupdf-1.26.0-cp39-abi3-win32.whl", hash = "sha256:eeb04a439355e2077f7675b8ad9377263d81990fc507748f2254a87d771d682b"},
+    {file = "pymupdf-1.26.0-cp39-abi3-win_amd64.whl", hash = "sha256:e39cc74ff030d773c4e76b9e5c5919cc4683895b73bd63bfd7a349a53ab5e8d7"},
+    {file = "pymupdf-1.26.0.tar.gz", hash = "sha256:ffe023f820379c84a0ddae38b0d07ea4016e1de84929491c34415520c629bcce"},
 ]
 
 [[package]]
@@ -2243,6 +2264,18 @@ cryptography = ["cryptography (>=3.4.0)"]
 pycrypto = ["pycrypto (>=2.6.0,<2.7.0)"]
 pycryptodome = ["pycryptodome (>=3.3.1,<4.0.0)"]
 test = ["pytest", "pytest-cov"]
+
+[[package]]
+name = "python-multipart"
+version = "0.0.20"
+description = "A streaming multipart parser for Python"
+optional = false
+python-versions = ">=3.8"
+groups = ["main"]
+files = [
+    {file = "python_multipart-0.0.20-py3-none-any.whl", hash = "sha256:8a62d3a8335e06589fe01f2a3e178cdcc632f3fbe0d492ad9ee0ec35aab1f104"},
+    {file = "python_multipart-0.0.20.tar.gz", hash = "sha256:8dd0cab45b8e23064ae09147625994d090fa46f5b0d1e13af944c331a7fa9d13"},
+]
 
 [[package]]
 name = "pytz"
@@ -2477,14 +2510,14 @@ pyasn1 = ">=0.1.3"
 
 [[package]]
 name = "s3transfer"
-version = "0.12.0"
+version = "0.13.0"
 description = "An Amazon S3 Transfer Manager"
 optional = false
 python-versions = ">=3.9"
 groups = ["main"]
 files = [
-    {file = "s3transfer-0.12.0-py3-none-any.whl", hash = "sha256:35b314d7d82865756edab59f7baebc6b477189e6ab4c53050e28c1de4d9cce18"},
-    {file = "s3transfer-0.12.0.tar.gz", hash = "sha256:8ac58bc1989a3fdb7c7f3ee0918a66b160d038a147c7b5db1500930a607e9a1c"},
+    {file = "s3transfer-0.13.0-py3-none-any.whl", hash = "sha256:0148ef34d6dd964d0d8cf4311b2b21c474693e57c2e069ec708ce043d2b527be"},
+    {file = "s3transfer-0.13.0.tar.gz", hash = "sha256:f5e6db74eb7776a37208001113ea7aa97695368242b364d73e91c981ac522177"},
 ]
 
 [package.dependencies]
@@ -2708,7 +2741,41 @@ sse-starlette = {version = "^2.3.5", extras = ["all"]}
 
 [package.source]
 type = "directory"
-url = "../common-sdk"
+url = "../../libs/common-sdk"
+
+[[package]]
+name = "tabula-note-sdk"
+version = "1.0.0"
+description = "An SDK that processes user-uploaded learning materials"
+optional = false
+python-versions = "^3.11"
+groups = ["main"]
+files = []
+develop = true
+
+[package.dependencies]
+anthropic = ">=0.50.0,<0.51.0"
+beautifulsoup4 = "^4.13.4"
+ipython = ">=9.2.0,<10.0.0"
+langchain = ">=0.3.20"
+langchain-core = ">=0.3.43"
+langchain-openai = ">=0.3.8"
+langgraph = ">=0.3.5"
+langsmith = ">=0.3.13"
+lxml = "^5.4.0"
+pandas = "^2.2.3"
+pillow = ">=11.2.1,<12.0.0"
+pinecone = "==6.0.2"
+pinecone-plugin-interface = "==0.0.7"
+pinecone-text = "==0.10.0"
+pymupdf = ">=1.25.5,<2.0.0"
+pypdf2 = ">=3.0.1,<4.0.0"
+tabula-common-sdk = {path = "../../libs/common-sdk", develop = true, extras = ["all"]}
+tiktoken = ">=0.9.0,<0.10.0"
+
+[package.source]
+type = "directory"
+url = "../../libs/note-sdk"
 
 [[package]]
 name = "tenacity"
@@ -2883,6 +2950,25 @@ brotli = ["brotli (>=1.0.9) ; platform_python_implementation == \"CPython\"", "b
 h2 = ["h2 (>=4,<5)"]
 socks = ["pysocks (>=1.5.6,!=1.5.7,<2.0)"]
 zstd = ["zstandard (>=0.18.0)"]
+
+[[package]]
+name = "uvicorn"
+version = "0.34.2"
+description = "The lightning-fast ASGI server."
+optional = false
+python-versions = ">=3.9"
+groups = ["main"]
+files = [
+    {file = "uvicorn-0.34.2-py3-none-any.whl", hash = "sha256:deb49af569084536d269fe0a6d67e3754f104cf03aba7c11c40f01aadf33c403"},
+    {file = "uvicorn-0.34.2.tar.gz", hash = "sha256:0e929828f6186353a80b58ea719861d2629d766293b6d19baf086ba31d4f3328"},
+]
+
+[package.dependencies]
+click = ">=7.0"
+h11 = ">=0.8"
+
+[package.extras]
+standard = ["colorama (>=0.4) ; sys_platform == \"win32\"", "httptools (>=0.6.3)", "python-dotenv (>=0.13)", "pyyaml (>=5.1)", "uvloop (>=0.14.0,!=0.15.0,!=0.15.1) ; sys_platform != \"win32\" and sys_platform != \"cygwin\" and platform_python_implementation != \"PyPy\"", "watchfiles (>=0.13)", "websockets (>=10.4)"]
 
 [[package]]
 name = "wcwidth"
@@ -3145,4 +3231,4 @@ cffi = ["cffi (>=1.11)"]
 [metadata]
 lock-version = "2.1"
 python-versions = "^3.11"
-content-hash = "90d6ffbea38e5c728cfbc8ef755c82c6e2d2e563e04a2a0aa8ea7f0bda38c0a9"
+content-hash = "643373e6142b13bc5bbfda314b21c9439b7f3b2b65f34f9f37c13eacb3980b43"
