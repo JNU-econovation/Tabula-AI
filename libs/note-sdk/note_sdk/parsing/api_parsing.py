@@ -14,16 +14,10 @@ logger = get_logger()
 # 설정 클래스 정의: 파싱에 필요한 기본 설정
 @dataclass
 class ParseConfig:
-    language: str  
-    domain_type: str  
-    output_dir: str = "result"
-
-# 필수 환경 변수 설정 확인
-def check_required_env_vars():
-    if common_settings.UPSTAGE_API_KEY is None:
-        logger.error("Upstage API Key is not set")
-        return False
-    return True
+    language: str # 언어 설정
+    domain_type: str # 도메인 타입
+    output_dir: str # 결과 디렉토리 경로
+    task_id: str # 작업 ID
  
 
 # PDF 문서 파싱을 위한 메인 함수
@@ -33,15 +27,12 @@ def parse_document(file: str, config: ParseConfig) -> Dict[str, Any]:
         file: 파일 경로
         config: 파싱 설정 객체
     """
-    # 환경 변수 확인
-    if not check_required_env_vars():
-        sys.exit(1)
 
     logger.info(f"Parsing file: {file}")
     logger.info(f"Parsing language: {config.language}")
     logger.info(f"Parsing domain: {config.domain_type}")
 
-    # 파서 그래프 생성 시 filepath 전달
+    # 파서 그래프 생성
     parser_graph = create_document_parse_graph(
         output_dir=config.output_dir,
         language=config.language,
@@ -56,21 +47,16 @@ def parse_document(file: str, config: ParseConfig) -> Dict[str, Any]:
 
     # 입력 데이터 구성
     inputs = {
-        "file": file,
         "language": config.language,
-        "domain_type": config.domain_type
+        "domain_type": config.domain_type,
+        "output_dir": config.output_dir,
+        "task_id": config.task_id,
+        "filetype": "pdf",
+        "include_image_in_output": True
     }
 
     # 파서 실행
     logger.info(f"Parsing: '{file}'")
-
-    # # 실행결과 스트리밍 출력
-    # stream_graph(parser_graph, inputs, run_config)
-
-    # # 결과 반환
-    # snapshot = parser_graph.get_state(run_config).values
-    # snapshot["document_id"] = os.path.splitext(os.path.basename(file))[0]
-    # return snapshot
 
     result = parser_graph.invoke(inputs, config=run_config)
     return result

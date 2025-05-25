@@ -4,6 +4,7 @@ from note_sdk.parsing.state import ParseState
 from note_sdk.parsing.element import Element
 from note_sdk.parsing.base import BaseNode
 from common_sdk.get_logger import get_logger
+from note_sdk.config import settings
 
 logger = get_logger()
 
@@ -22,17 +23,14 @@ class CreateElementsNode(BaseNode):
         self.add_newline = add_newline
         self.newline = "\n" if add_newline else ""
 
-    def _save_base64_image(self, base64_str, basename, page_num, element_id, directory):
+    def save_base64_image(self, base64_str, task_id, page_num, element_id):
         """base64 인코딩된 이미지를 파일로 저장하는 함수"""
-        # document_id 추출
-        document_id = os.path.splitext(basename)[0]
-        
-        # result/images/{document_id} 디렉토리에 저장
-        image_dir = os.path.join("result", "images", document_id)
+        # settings.get_image_dir() 사용
+        image_dir = settings.get_image_dir(task_id)
         os.makedirs(image_dir, exist_ok=True)
         
-        # 이미지 파일명을 document_id_Page_X_Index_Y.png 형식으로 생성
-        img_filename = f"{document_id}_Page_{page_num}_Index_{element_id}.png"
+        # 이미지 파일명 생성
+        img_filename = f"image_{page_num}_{element_id}.png"
         img_filepath = os.path.join(image_dir, img_filename)
         
         # base64 디코딩 및 이미지 저장
@@ -43,8 +41,8 @@ class CreateElementsNode(BaseNode):
 
     def execute(self, state: ParseState) -> ParseState:
         post_processed_elements = []
-        directory = os.path.dirname(state["filepath"])
-        base_filename = os.path.splitext(os.path.basename(state["filepath"]))[0]
+        task_id = state["task_id"]
+        document_id = task_id
 
         for element in state["elements_from_parser"]:
             elem = None
@@ -66,12 +64,11 @@ class CreateElementsNode(BaseNode):
             elif element["category"] in ["figure", "chart"]:
                 # (markdown + image crop/image save)
                 # figure, chart
-                image_filename = self._save_base64_image(
+                image_filename = self.save_base64_image(
                     element["base64_encoding"],
-                    base_filename,
+                    task_id,
                     element["page"],
                     element["id"],
-                    directory,
                 )
 
                 elem = Element(

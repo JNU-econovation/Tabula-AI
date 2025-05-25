@@ -12,14 +12,16 @@ from common_sdk.get_logger import get_logger
 logger = get_logger()
 
 class KeywordGuide:
-    def __init__(self, domain: str, llm_model_name: str = "gpt-4.1-mini", temperature: float = 0):
+    def __init__(self, domain: str, task_id: str = None, llm_model_name: str = "gpt-4.1-mini", temperature: float = 0):
         """
         Args:
             domain: 도메인 타입
+            task_id: 작업 ID
             llm_model_name: 사용할 LLM 모델 이름
             temperature: LLM의 temperature 값
         """
         self.domain_type = domain
+        self.task_id = task_id
         self.llm = ChatOpenAI(model=llm_model_name, temperature=temperature, openai_api_key=common_settings.OPENAI_API_KEY_J)
 
         # 프롬프트 로더 초기화
@@ -57,12 +59,12 @@ class KeywordGuide:
         user_tokens = num_tokens_from_string(user_prompt_content)
         total_tokens = system_tokens + user_tokens
         
-        print(f"\n=== 토큰 사용량 ===")
-        print(f"시스템 프롬프트: {system_tokens} 토큰")
-        print(f"사용자 프롬프트: {user_tokens} 토큰")
-        print(f"총 토큰 수: {total_tokens} 토큰")
+        logger.info(f"\n=== 토큰 사용량 ===")
+        logger.info(f"시스템 프롬프트: {system_tokens} 토큰")
+        logger.info(f"사용자 프롬프트: {user_tokens} 토큰")
+        logger.info(f"총 토큰 수: {total_tokens} 토큰")
         
-        response_obj = None # API 응답 객체를 저장할 변수 초기화
+        response_obj = None
         try:
             # LLM 호출
             response_obj = self.llm.invoke(messages)
@@ -73,41 +75,44 @@ class KeywordGuide:
                 
                 # 응답 토큰 수 계산
                 response_tokens = num_tokens_from_string(raw_content)
-                print(f"응답 토큰 수: {response_tokens} 토큰")
-                print(f"총 처리 토큰 수: {total_tokens + response_tokens} 토큰")
+                logger.info(f"응답 토큰 수: {response_tokens} 토큰")
+                logger.info(f"총 처리 토큰 수: {total_tokens + response_tokens} 토큰")
                 
                 if not raw_content or not raw_content.strip():
-                    print("Error: LLM response content is empty or consists only of whitespace.")
+                    logger.error("Error: LLM response content is empty")
                     return None
                 
-                # 마크다운 코드 블록 제거 로직 추가
                 cleaned_json_str = raw_content.strip()
                 if cleaned_json_str.startswith("```json") and cleaned_json_str.endswith("```"):
                     cleaned_json_str = cleaned_json_str[len("```json"):].rstrip("`\n ")
                 elif cleaned_json_str.startswith("```") and cleaned_json_str.endswith("```"):
                     cleaned_json_str = cleaned_json_str[len("```"):].rstrip("`\n ")
 
-                # 여기서부터 JSON 파싱 시도
-                return json.loads(cleaned_json_str)
+                try:
+                    return json.loads(cleaned_json_str)
+                except json.JSONDecodeError as e:
+                    logger.error(f"JSON 파싱 실패: {e}")
+                    return {
+                        "name": "문서 분석 실패",
+                        "children": [
+                            {
+                                "name": "분석 오류",
+                                "children": [
+                                    {
+                                        "name": "JSON 파싱 실패",
+                                        "children": [
+                                            {"name": "LLM 응답 형식 오류"}
+                                        ]
+                                    }
+                                ]
+                            }
+                        ]
+                    }
             
-            elif response_obj:
-                logger.error(f"Error: LLM response object does not have 'content' attribute or is None.")
-                logger.error(f"DEBUG: LLM response_obj type: {type(response_obj)}")
-                logger.error(f"DEBUG: LLM response_obj: {str(response_obj)}")
-                return None
-            else:
-                logger.error("Error: LLM call did not return a response object (response_obj is None).")
-                return None
+            return None
             
-        except json.JSONDecodeError as e:
-            logger.error(f"LLM Response JSON Parsing Error: {e}. Please refer to the DEBUG output above for the parsed content.")
-            return None 
         except Exception as e:
-            logger.error(f"Unexpected error occurred during LLM call or response processing: {e}")
-            if response_obj and hasattr(response_obj, 'content'):
-                 logger.error(f"DEBUG: (Exception context) LLM content: {response_obj.content}")
-            elif response_obj:
-                 logger.error(f"DEBUG: (Exception context) LLM response object: {str(response_obj)}")
+            logger.error(f"LLM 호출 중 오류 발생: {e}")
             return None
 
     # LLM을 위한 마인드맵 생성용 프롬프트 생성
@@ -115,8 +120,18 @@ class KeywordGuide:
         # 내용 전처리
         processed_content = self.preprocess_markdown_content(content)
         
-        # PromptLoader를 사용하여 프롬프트 생성
-        return self.keyword_prompt["template"].format(content=processed_content)
+        # 프롬프트 템플릿 가져오기
+        template = self.keyword_prompt.get("template", "")
+        if not template:
+            logger.error("프롬프트 템플릿을 찾을 수 없습니다.")
+            return ""
+            
+        # 프롬프트 생성
+        try:
+            return template.format(content=processed_content)
+        except Exception as e:
+            logger.error(f"프롬프트 생성 중 오류 발생: {e}")
+            return ""
 
     # 마크다운 파일로부터 마인드맵 구조 생성
     def generate_mindmap_from_markdown(self, md_path: str) -> Dict[str, Any]:
@@ -143,5 +158,5 @@ class KeywordGuide:
             mindmap_data["document_id"] = Path(md_path).stem
             return mindmap_data
         else:
-            print(f"Error: Failed to generate mindmap data or unexpected format received. Data: {mindmap_data}")
+            logger.error("Error: Failed to generate mindmap data")
             return {}
