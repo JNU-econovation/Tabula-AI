@@ -17,8 +17,8 @@ pytest = "^8.3.5"
 pytest-asyncio = "^0.26.0"
 openai = "^1.81.0"
 pytz = "^2025.2"
-passlib = {extras = ["bcrypt"], version = "^1.7.4"}
-python-jose = {extras = ["cryptography"], version = "^3.4.0"}
+python-jose = {extras = ["cryptograph"], version = "^3.4.0"}
+sse-starlette = {version = "^2.3.5", extras = ["all"]}
 
 
 [build-system]
