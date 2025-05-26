@@ -1,9 +1,9 @@
 from fastapi import status
 
-# API 응답 구성 예시
-get_detail_responses = {
+# 공통 응답 구성
+security_responses = {
     401: {
-        "description": "인증 오류: 잘못된 인증 토큰 또는 만료된 인증 토큰",
+        "description": "인증 오류",
         "content": {
             "application/json": {
                 "examples": {
@@ -30,24 +30,251 @@ get_detail_responses = {
                                 "http_status": status.HTTP_401_UNAUTHORIZED
                             }
                         }
+                    },
+                    "EmptyJWT": {
+                        "summary": "빈 인증 토큰",
+                        "value": {
+                            "success": False,
+                            "response": None,
+                            "error": {
+                                "code": "SECURITY_401_3",
+                                "reason": "인증 토큰이 존재하지 않습니다.",
+                                "http_status": status.HTTP_401_UNAUTHORIZED
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+# Note Service 응답 구성
+note_service_response = {
+    **security_responses,
+    400: {
+        "description": "요청 데이터 오류",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "MissingFieldData": {
+                        "summary": "필드 데이터 누락",
+                        "value": {
+                            "success": False,
+                            "response": None,
+                            "error": {
+                                "code": "SPACE_400_1",
+                                "reason": "필드 데이터가 누락되었습니다.",
+                                "http_status": status.HTTP_400_BAD_REQUEST
+                            }
+                        }
+                    },
+                    "MissingNoteFileData": {
+                        "summary": "파일 데이터 누락",
+                        "value": {
+                            "success": False,
+                            "response": None,
+                            "error": {
+                                "code": "FILE_400_1",
+                                "reason": "파일 데이터(PDF) 누락입니다.",
+                                "http_status": status.HTTP_400_BAD_REQUEST
+                            }
+                        }
+                    },
+                    "UnsupportedNoteFileFormat": {
+                        "summary": "파일 형식 미지원",
+                        "value": {
+                            "success": False,
+                            "response": None,
+                            "error": {
+                                "code": "FILE_400_2",
+                                "reason": "파일 형식이 유효하지 않습니다.(지원되는 파일 형식: PDF).",
+                                "http_status": status.HTTP_400_BAD_REQUEST
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    413: {
+        "description": "파일 크기 초과",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "NoteFileSizeExceeded": {
+                        "summary": "파일 용량 초과",
+                        "value": {
+                            "success": False,
+                            "response": None,
+                            "error": {
+                                "code": "FILE_413_1",
+                                "reason": "파일(PDF) 크기 허용 범위 초과입니다.(허용 범위: 5MB)",
+                                "http_status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+# Note Service Task 응답 구성
+note_service_task_response = {
+    **security_responses,
+    400: {
+        "description": "요청 데이터 오류",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "MissingTaskId": {
+                        "summary": "Task ID 누락",
+                        "value": {
+                            "success": False,
+                            "response": None,
+                            "error": {
+                                "code": "TASK_400_1",
+                                "reason": "Request-Header에 taskId가 누락되었습니다.",
+                                "http_status": status.HTTP_400_BAD_REQUEST
+                            }
+                        }
                     }
                 }
             }
         }
     },
     404: {
-        "description": "데이터 오류: 분석에 필요한 데이터 미존재 또는 분석 기록 없음",
+        "description": "리소스 미존재",
         "content": {
             "application/json": {
                 "examples": {
-                    "NoAnalysisRecord": {
-                        "summary": "분석 기록 없음(해당 유저는 분석이 성공한 경우가 존재하지 않음)",
+                    "TaskIdNotFound": {
+                        "summary": "Task ID 미존재",
                         "value": {
                             "success": False,
                             "response": None,
                             "error": {
-                                "code": "DIET_404_3",
-                                "reason": "해당 유저에 대한 분석 기록이 존재하지 않습니다.",
+                                "code": "TASK_404_1",
+                                "reason": "요청 데이터(taskId)에 해당하는 리소스가 존재하지 않습니다.",
+                                "http_status": status.HTTP_404_NOT_FOUND
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+# Result Service 응답 구성
+result_service_response = {
+    **security_responses,
+    400: {
+        "description": "요청 데이터 오류",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "MissingResultFileData": {
+                        "summary": "결과물 파일 데이터 누락",
+                        "value": {
+                            "success": False,
+                            "response": None,
+                            "error": {
+                                "code": "FILE_400_3",
+                                "reason": "파일 데이터(PDF/Image) 누락입니다.",
+                                "http_status": status.HTTP_400_BAD_REQUEST
+                            }
+                        }
+                    },
+                    "UnsupportedResultFileFormat": {
+                        "summary": "결과물 파일 형식 미지원",
+                        "value": {
+                            "success": False,
+                            "response": None,
+                            "error": {
+                                "code": "FILE_400_4",
+                                "reason": "파일 형식이 유효하지 않습니다.(지원되는 파일 형식: PDF / Image)",
+                                "http_status": status.HTTP_400_BAD_REQUEST
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    413: {
+        "description": "파일 크기 초과",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "ResultFileSizeExceeded": {
+                        "summary": "결과물 파일 용량 초과",
+                        "value": {
+                            "success": False,
+                            "response": None,
+                            "error": {
+                                "code": "FILE_413_2",
+                                "reason": "파일(PDF / Image) 크기가 허용 범위 초과입니다.(허용 범위: 5MB)",
+                                "http_status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+                            }
+                        }
+                    },
+                    "ResultFileUploadPageExceeded": {
+                        "summary": "결과물 업로드 페이지 초과",
+                        "value": {
+                            "success": False,
+                            "response": None,
+                            "error": {
+                                "code": "FILE_413_3",
+                                "reason": "파일(PDF / Image)입력 페이지가 허용 범위 초과입니다.(허용 범위: 6페이지)",
+                                "http_status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+# Result Service Task 응답 구성
+result_service_task_response = {
+    **security_responses,
+    400: {
+        "description": "요청 데이터 오류",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "MissingTaskId": {
+                        "summary": "Task ID 누락",
+                        "value": {
+                            "success": False,
+                            "response": None,
+                            "error": {
+                                "code": "TASK_400_1",
+                                "reason": "Request-Header에 taskId가 누락되었습니다.",
+                                "http_status": status.HTTP_400_BAD_REQUEST
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    },
+    404: {
+        "description": "리소스 미존재",
+        "content": {
+            "application/json": {
+                "examples": {
+                    "TaskIdNotFound": {
+                        "summary": "Task ID 미존재",
+                        "value": {
+                            "success": False,
+                            "response": None,
+                            "error": {
+                                "code": "TASK_404_1",
+                                "reason": "요청 데이터(taskId)에 해당하는 리소스가 존재하지 않습니다.",
                                 "http_status": status.HTTP_404_NOT_FOUND
                             }
                         }

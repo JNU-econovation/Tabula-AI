@@ -11,6 +11,10 @@ COMMON_SDK_ROOT = os.path.dirname(os.path.dirname(__file__))
 load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
 
 class Settings:
+
+    # Swagger
+    SWAGGER_USERNAME = os.getenv("SWAGGER_USERNAME")
+    SWAGGER_PASSWORD = os.getenv("SWAGGER_PASSWORD")
     
     # API Key
     UPSTAGE_API_KEY = os.getenv("UPSTAGE_API_KEY")
@@ -40,8 +44,9 @@ class Settings:
     AWS_REGION = os.getenv("AWS_REGION")
     S3_BUCKET = os.getenv("S3_BUCKET")
 
-    # JWT
+    # Auth
     JWT_SECRET = os.getenv("JWT_SECRET")
+    ALGORITHM = os.getenv("ALGORITHM")
 
     # Path setting
     LOG_PATH = os.getenv("LOG_PATH", os.path.join(PROJECT_ROOT, "logs"))

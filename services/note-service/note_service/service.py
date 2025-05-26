@@ -55,22 +55,35 @@ class NoteService:
             
             # 2. 파싱 결과를 기반으로 비동기 작업 시작
             logger.info("=== Starting Parallel Processing ===")
+            # 마크다운 처리와 키워드 생성만 진행률에 포함
             tasks = [
                 self.process_markdown(),  # 마크다운 처리 및 벡터 DB 적재
                 self.generate_keywords(),  # 키워드 생성
-                self.process_images_background()  # 이미지 처리(Background)
             ]
             
             # 마크다운 처리 / 키워드 생성은 SSE 포함
-            markdown_result, keyword_result, _ = await asyncio.gather(*tasks)
+            markdown_result, keyword_result = await asyncio.gather(*tasks)
             self._keyword_result = keyword_result
 
             # 3. 완료 (100%)
             logger.info("=== Processing Completed ===")
             self._current_progress = 100
-            update_progress(self.task_id, self._current_progress)
+            # 완료 시 결과값 포함하여 업데이트
+            update_progress(
+                self.task_id, 
+                self._current_progress,
+                {
+                    "spaceId": 1,  # 하드코딩
+                    "spaceName": keyword_result.get("spaceName", self.document_id),
+                    "keywords": keyword_result.get("mindmap")
+                }
+            )
 
-            # 4. 작업 디렉토리 정리
+            # 4. 이미지 처리 (백그라운드)
+            logger.info("=== Starting Image Processing ===")
+            await self.process_images_background()
+
+            # 5. 작업 디렉토리 정리
             self.cleanup_task_directory(self.task_dir)
             
             return {
