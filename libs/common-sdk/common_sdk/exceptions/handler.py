@@ -1,9 +1,13 @@
 from fastapi import Request, FastAPI, HTTPException
 from fastapi.responses import JSONResponse
-from errors.business_exception import (
-    InvalidJWT, ExpiredJWT
+from common_sdk.exceptions import (
+    InvalidJWT, ExpiredJWT, EmptyJWT,
+    MissingFieldData,
+    MissingNoteFileData, UnsupportedNoteFileFormat, NoteFileSizeExceeded,
+    MissingResultFileData, UnsupportedResultFileFormat, ResultFileSizeExceeded, ResultFileUploadPageExceeded,
+    MissingTaskId, TaskIdNotFound
 )
-from errors.server_exception import (
+from common_sdk.exceptions import (
     FileAccessError
 )
 
@@ -32,7 +36,19 @@ async def business_exception_handler(request: Request, exc: HTTPException):
 def register_exception_handlers(app: FastAPI):
     # 서버 예외 핸들러 등록
     app.add_exception_handler(FileAccessError, server_exception_handler)
+    
 
     # 비즈니스 예외 핸들러 등록
     app.add_exception_handler(InvalidJWT, business_exception_handler)
     app.add_exception_handler(ExpiredJWT, business_exception_handler)
+    app.add_exception_handler(EmptyJWT, business_exception_handler)
+    app.add_exception_handler(MissingFieldData, business_exception_handler)
+    app.add_exception_handler(MissingNoteFileData, business_exception_handler)
+    app.add_exception_handler(UnsupportedNoteFileFormat, business_exception_handler)
+    app.add_exception_handler(NoteFileSizeExceeded, business_exception_handler)
+    app.add_exception_handler(MissingResultFileData, business_exception_handler)
+    app.add_exception_handler(UnsupportedResultFileFormat, business_exception_handler)
+    app.add_exception_handler(ResultFileSizeExceeded, business_exception_handler)
+    app.add_exception_handler(ResultFileUploadPageExceeded, business_exception_handler)
+    app.add_exception_handler(MissingTaskId, business_exception_handler)
+    app.add_exception_handler(TaskIdNotFound, business_exception_handler)
