@@ -16,18 +16,34 @@ class MissingAnalyzer:
         self.workflow = MissingAnalysisWorkflow()
         self.data_processor = DataProcessor()
 
-    async def analyze(self, keyword_data: Dict[str, Any], user_inputs: str) -> Dict[str, Any]:
+    async def analyze(self, space_id: str, user_inputs: str) -> Dict[str, Any]:
         """
         누락 분석 실행
         """
         try:
-            logger.info("Starting Missing Analysis")
+            logger.info(f"Starting Missing Analysis for space_id: {space_id}")
 
-            result = await self.workflow.run_analysis(keyword_data, user_inputs)
+            # 입력 데이터 검증
+            if not space_id:
+                raise ValueError("space_id is necessary")
+            
+            if not user_inputs or not isinstance(user_inputs, str):
+                raise ValueError("user_inputs must be a string, not an empty string")
+
+            # 워크플로우 실행
+            result = await self.workflow.run_analysis(space_id, user_inputs)
 
             logger.info("Missing Analysis Completed")
 
             return result
+        
+        except ValueError as ve:
+            logger.error(f"Input validation error: {ve}")
+            return {
+                "success": False,
+                "error": f"Input validation error: {str(ve)}",
+                "missing_items": []
+            }
         
         except Exception as e:
             logger.error(f"failed to analyze missing items: {e}")

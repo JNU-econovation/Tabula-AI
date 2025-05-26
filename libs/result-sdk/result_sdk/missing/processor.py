@@ -11,18 +11,19 @@ class DataProcessor:
     """
     
     def __init__(self):
-        self.raw_keyword_data: Dict[str, Any] = {}
+        self.keyword_data: Dict[str, Any] = {}
         self.raw_user_inputs: str = ""
 
     def set_keyword_data(self, keyword_data: Dict[str, Any]) -> None:
         """
-        키워드 데이터 설정 (파일 업로드 → MongoDB 조회 변경 예정)
+        키워드 데이터 설정
         """
         if not isinstance(keyword_data, dict):
             raise ValueError("Keyword data must be a dictionary")
         
-        self.raw_keyword_data = keyword_data
-        logger.info("Keyword data set successfully")
+        self.keyword_data = keyword_data  # 단일 키워드 객체 저장
+        logger.info(f"Keyword data set successfully: {keyword_data.get('name', 'Unknown')}")
+        logger.info(f"Keyword data: {str(keyword_data)[:300]}")
     
     def set_user_inputs(self, user_inputs: str) -> None:
         """
@@ -42,12 +43,14 @@ class DataProcessor:
         indent = "  " * level
         
         if level == 0:
+            # 최상위 레벨은 기호 없이
             result = f"{node['name']}\n"
         else:
             # 레벨에 따라 다른 기호 사용
             prefix = "-" if level == 1 else ("*" if level == 2 else "+")
             result = f"{indent}{prefix} {node['name']}\n"
         
+        # 자식 노드가 있으면 재귀적으로 처리
         if "children" in node and node["children"]:
             for child in node["children"]:
                 result += self.format_hierarchy_list(child, level + 1)
@@ -58,6 +61,11 @@ class DataProcessor:
         """
         사용자 입력에서 텍스트 내용만 추출
         """
+
+        if not user_inputs:
+            logger.warning("Empty user inputs provided")
+            return ""
+
         try:
             # 문자열을 JSON으로 파싱
             data = json.loads(user_inputs)
@@ -72,4 +80,8 @@ class DataProcessor:
             return "\n".join(texts)
         except json.JSONDecodeError:
             # JSON 파싱 실패 시 원본 텍스트 반환
+            return user_inputs
+        
+        except Exception as e:
+            logger.error(f"Unexpected error in extract_user_content: {e}")
             return user_inputs
