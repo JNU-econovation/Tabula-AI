@@ -7,6 +7,13 @@ from note_service.service import NoteService
 from common_sdk.sse import get_progress_stream
 from common_sdk.auth.decoded_token import get_current_member
 from note_sdk.config import settings
+from common_sdk.swagger import note_service_response, note_service_task_response
+
+from common_sdk.get_logger import get_logger
+
+# 로그 설정
+logger = get_logger()
+
 
 router = APIRouter(
     tags=["Note Service"]
@@ -16,11 +23,11 @@ router = APIRouter(
 service_instances: Dict[str, NoteService] = {}
 
 # 학습 자료 업로드 API
-@router.post("/{folderId}/upload")
+@router.post("/{folderId}/upload", responses=note_service_response)
 async def upload_file(
     folderId: int,
     background_tasks: BackgroundTasks,
-    # userId: int = Depends(get_current_member),
+    userId: int = Depends(get_current_member),
     file: UploadFile = Form(...),
     langType: str = Form(...),
     fileDomain: str = Form(...)
@@ -30,6 +37,15 @@ async def upload_file(
     2. 파일 확장자 제한(pdf)
     3. 파일 용량 제한(5MB) 필요 
     """
+
+    # # 지원하는 파일 형식
+    # ALLOWED_FILE_TYPES = ["image/jpeg", "image/png"]
+
+    # # 파일 형식 검증
+    # if file.content_type not in ALLOWED_FILE_TYPES:
+    #     logger.error(f"userId: {userId} Unsupported file type: {file.content_type}")
+    #     raise HTTPException(status_code=400, detail="Unsupported file type")
+
     # 파일 업로드 API
     task_id = str(uuid.uuid4())
     
@@ -73,11 +89,11 @@ async def upload_file(
 
 
 # 학습 자료 진행률 조회 및 결과 확인 API
-@router.get("/{folderId}/progress/{taskId}")
+@router.get("/{folderId}/progress/{taskId}", responses=note_service_task_response)
 async def get_progress(
     folderId: int,
     taskId: str,
-    # user_id: int = Depends(get_current_member)
+    user_id: int = Depends(get_current_member)
 ):
     """
     SSE를 사용하여 진행률을 실시간으로 전송
@@ -85,6 +101,7 @@ async def get_progress(
     # 서비스 인스턴스 조회
     service = service_instances.get(taskId)
     if not service:
+        logger.error(f"userId: {user_id} Task not found: {taskId}")
         raise HTTPException(status_code=404, detail="Task not found")
 
     # 진행률 스트림 반환

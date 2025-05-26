@@ -9,10 +9,8 @@ from common_sdk.get_logger import get_logger
 logger = get_logger()
 
 
-# 인증을 위한 환경변수 세팅
-ALGORITHM = "HS256"
-
-# BASE64로 인코딩된 JWT_SECRET 디코딩
+# 인증 환경변수 세팅
+ALGORITHM = settings.ALGORITHM
 JWT_SECRET = base64.urlsafe_b64decode(settings.JWT_SECRET)
 
 
@@ -40,7 +38,7 @@ async def get_current_member(token: str = Depends(get_token_from_header)):
             logger.error("Token does not contain user_id")
             raise Exception("Token does not contain user_id")
         
-        logger.debug(f"Decoded token user_id: {user_id}")
+        logger.error(f"Decoded token user_id: {user_id}")
         return user_id
 
     except ExpiredSignatureError:

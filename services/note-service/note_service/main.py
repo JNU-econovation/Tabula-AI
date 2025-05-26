@@ -1,22 +1,26 @@
 import uvicorn
-
 from datetime import datetime
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from note_service.router import router
+from note_service.router import router as note_router
+from common_sdk.swagger import router as swagger_router
+from common_sdk.exceptions import register_exception_handlers
 
+# FastAPI Instance
 app = FastAPI(
     title="Tabula Service",
     description="Note Service API",
-    version="1.0.0"
+    version="1.0.0",
+    docs_url=None,  # 기본 Swagger UI 비활성화
+    redoc_url=None  # 기본 ReDoc UI 비활성화
 )
 
+# CORS
 origins = [
     "http://localhost:3000",
     # Front Deploy URL
 ]
-# CORS 설정
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
@@ -25,6 +29,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# root
 @app.get("/")
 async def root():
     return {"message": "Welcome to Tabula Note Service"}
@@ -34,9 +39,13 @@ async def root():
 async def health_check():
     return {"status": "ok", "timestamp": datetime.now().isoformat()}
 
+# exception handler
+register_exception_handlers(app)
 
-app.include_router(router, prefix="/v1/spaces")
+# routers
+app.include_router(note_router, prefix="/v1/spaces")
+app.include_router(swagger_router, prefix="/api")  # /api/docs, /api/redoc
 
-
+# run server
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
