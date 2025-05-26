@@ -1,12 +1,13 @@
 import base64
+
 from fastapi import Depends, Header
 from jose import jwt, ExpiredSignatureError
+
 from common_sdk.config import settings
 from common_sdk.exceptions import InvalidJWT, ExpiredJWT, EmptyJWT
-
 from common_sdk.get_logger import get_logger
 
-# 로그 설정
+# 로거 설정
 logger = get_logger()
 
 

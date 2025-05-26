@@ -1,4 +1,5 @@
 import tiktoken
+
 from openai import OpenAI
 from .config import settings
 from typing import List, Literal
@@ -46,5 +47,3 @@ def get_embedding(text: str, language: Literal["ko", "en"] = "ko") -> List[float
     except Exception as e:
         print(f"임베딩 생성 실패: {str(e)}")
         raise
-
-# pinecone 클라이언트 연결 및 BM25 인코더 설정 필요

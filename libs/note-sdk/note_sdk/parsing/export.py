@@ -1,5 +1,6 @@
 import os
 import base64
+
 from note_sdk.parsing.base import BaseNode
 from note_sdk.parsing.state import ParseState
 from note_sdk.config import settings

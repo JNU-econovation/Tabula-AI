@@ -1,8 +1,9 @@
 import os
 import base64
 import requests
-from IPython.display import Image, display
+
 from enum import Enum
+from IPython.display import Image, display
 
 class LLMs(Enum):
     GPT4o_MINI = "gpt-4o-mini"

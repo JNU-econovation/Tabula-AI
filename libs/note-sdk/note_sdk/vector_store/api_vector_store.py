@@ -1,16 +1,17 @@
 import re
 import asyncio
+
 from pinecone import Pinecone
-from note_sdk.config import settings
-from common_sdk.utils import get_embedding
 from typing import List, Dict, Any, Literal
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from concurrent.futures import ThreadPoolExecutor
 from pinecone_text.sparse import BM25Encoder
 
+from common_sdk.utils import get_embedding
+from note_sdk.config import settings
 from common_sdk.get_logger import get_logger
 
-# 로그 설정
+# 로거 설정
 logger = get_logger()
 
 

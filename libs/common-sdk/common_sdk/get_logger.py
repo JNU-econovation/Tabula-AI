@@ -18,23 +18,24 @@ class KSTFormatter(logging.Formatter):
         else:
             return dt.isoformat()
         
-# # Uvicorn 로거 설정 (FastAPI 사용 시 주석 해제)
-# def configure_uvicorn_logger():
-#     uvicorn_logger = logging.getLogger("uvicorn")
-#     access_logger = logging.getLogger("uvicorn.access")
-#     error_logger = logging.getLogger("uvicorn.error")
+# Uvicorn 로거 설정 (FastAPI 사용 시 주석 해제)
+def configure_uvicorn_logger():
+    uvicorn_logger = logging.getLogger("uvicorn")
+    access_logger = logging.getLogger("uvicorn.access")
+    error_logger = logging.getLogger("uvicorn.error")
 
-#     # Formatter 설정
-#     formatter = KSTFormatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
+    # Formatter 설정
+    formatter = KSTFormatter('%(asctime)s - %(levelname)s - %(message)s', datefmt='%Y-%m-%d %H:%M:%S')
 
-#     for logger in [uvicorn_logger, access_logger, error_logger]:
-#         for handler in logger.handlers:
-#             handler.setFormatter(formatter)
+    for logger in [uvicorn_logger, access_logger, error_logger]:
+        for handler in logger.handlers:
+            handler.setFormatter(formatter)
 
 # 공용 로거 생성(INFO, ERROR)
 def get_logger():
-    # # Uvicorn 로거 설정 (FastAPI 사용 시 주석 해제)
-    # configure_uvicorn_logger()
+    
+    # Uvicorn 로거 설정 (FastAPI 사용 시 주석 해제)
+    configure_uvicorn_logger()
     
     logger = logging.getLogger("app_logger")
     # 중복 핸들러 방지

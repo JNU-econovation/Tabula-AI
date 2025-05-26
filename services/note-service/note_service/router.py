@@ -5,7 +5,7 @@ from fastapi import APIRouter, UploadFile, Form, BackgroundTasks, Depends, File
 
 from note_service.service import NoteService
 from common_sdk.sse import get_progress_stream
-from common_sdk.auth.decoded_token import get_current_member
+from common_sdk.auth import get_current_member
 from note_sdk.config import settings
 from common_sdk.swagger import note_service_response, note_service_task_response
 from common_sdk.exceptions import (

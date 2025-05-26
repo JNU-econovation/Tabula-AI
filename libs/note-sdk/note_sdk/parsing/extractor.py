@@ -1,5 +1,6 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables import chain
+
 from note_sdk.llm import MultiModal
 from note_sdk.parsing.state import ParseState
 from note_sdk.parsing.base import BaseNode

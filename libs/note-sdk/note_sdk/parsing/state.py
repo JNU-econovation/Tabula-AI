@@ -1,7 +1,9 @@
 import operator
+
 from typing import TypedDict, Annotated, List, Dict, Optional
-from note_sdk.parsing.element import Element
 from langchain_core.documents import Document
+
+from note_sdk.parsing.element import Element
 
 """
 파싱 상태 클래스 정의

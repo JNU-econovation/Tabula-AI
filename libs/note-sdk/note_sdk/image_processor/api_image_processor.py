@@ -1,21 +1,23 @@
 import os
 import io
 import re
-import yaml
 import asyncio
+
+from PIL import Image
 from typing import List, Dict
 from openai import OpenAI
-from common_sdk.config import settings as common_settings
-from note_sdk.config import settings
-from common_sdk.utils import get_embedding
-from PIL import Image
-from tenacity import retry, stop_after_attempt, wait_exponential
-from note_sdk.llm import MultiModal, LLMs
 from langchain_openai import ChatOpenAI
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+from note_sdk.llm import MultiModal, LLMs
+from note_sdk.config import settings
+from common_sdk.config import settings as common_settings
+from common_sdk.utils import get_embedding
 from common_sdk.utils import num_tokens_from_string
 from common_sdk.get_logger import get_logger
 from common_sdk.prompt_loader import PromptLoader
 
+# 로거 설정
 logger = get_logger()
 
 # 이미지 요약 클래스

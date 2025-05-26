@@ -1,14 +1,17 @@
 import re 
 import json
-from common_sdk.config import settings as common_settings
-from common_sdk.utils import num_tokens_from_string
-from common_sdk.prompt_loader import PromptLoader
+
 from typing import Dict, Any
 from pathlib import Path
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage 
+
+from common_sdk.config import settings as common_settings
+from common_sdk.utils import num_tokens_from_string
+from common_sdk.prompt_loader import PromptLoader
 from common_sdk.get_logger import get_logger
 
+# 로거 설정
 logger = get_logger()
 
 class KeywordGuide:

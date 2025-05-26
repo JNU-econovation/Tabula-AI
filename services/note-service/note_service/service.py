@@ -5,14 +5,15 @@ from pathlib import Path
 from typing import Dict, Any, Optional
 from datetime import datetime
 
-from note_sdk.parsing.api_parsing import ParseConfig, parse_document
-from note_sdk.keyword.api_keyword import KeywordGuide
-from note_sdk.image_processor.api_image_processor import ImageSummary
-from note_sdk.vector_store.api_vector_store import VectorLoader
+from note_sdk.parsing import ParseConfig, parse_document
+from note_sdk.keyword import KeywordGuide
+from note_sdk.image_processor import ImageSummary
+from note_sdk.vector_store import VectorLoader
 from common_sdk.sse import update_progress
 from note_sdk.config import settings
 from common_sdk.get_logger import get_logger
 
+# 로거 설정
 logger = get_logger()
 
 # 학습 자료 업로드 클래스
