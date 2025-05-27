@@ -1,46 +1,68 @@
-from typing import Optional
+from typing import Optional, Dict, Any
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo import MongoClient
-from ..config import settings
+
+from common_sdk.config import settings
+from common_sdk.get_logger import get_logger
+
+logger = get_logger()
 
 class MongoDB:
-    _instance: Optional['MongoDB'] = None
-    _client: Optional[AsyncIOMotorClient] = None
-    _sync_client: Optional[MongoClient] = None
-    _db: Optional[AsyncIOMotorDatabase] = None
+    instance: Optional['MongoDB'] = None
+    client: Optional[AsyncIOMotorClient] = None
+    sync_client: Optional[MongoClient] = None
+    db: Optional[AsyncIOMotorDatabase] = None
     
     def __new__(cls):
-        if cls._instance is None:
-            cls._instance = super().__new__(cls)
-        return cls._instance
+        if cls.instance is None:
+            cls.instance = super().__new__(cls)
+        return cls.instance
     
     def __init__(self):
-        if not self._client:
-            self._client = AsyncIOMotorClient(settings.MONGO_URI)
-            self._sync_client = MongoClient(settings.MONGO_URI)
-            self._db = self._client[settings.MONGO_DATABASE]
+        if not self.client:
+            self.client = AsyncIOMotorClient(settings.MONGO_URI)
+            self.sync_client = MongoClient(settings.MONGO_URI)
+            self.db = self.client[settings.MONGO_DATABASE]
     
+    # MongoDB 연결 상태 확인
+    def check_connection(self) -> Dict[str, Any]:
+        try:
+            # ping check
+            self.db.command('ping')
+            logger.info("MongoDB connection successful")
+            return {
+                "success": True,
+                "response": {"status": "connected"},
+                "error": None
+            }
+        except Exception as e:
+            logger.error(f"MongoDB connection failed: {str(e)}")
+            return {
+                "success": False,
+                "response": None,
+                "error": {
+                    "code": "MONGODB_CONNECTION_ERROR",
+                    "reason": str(e)
+                }
+            }
+    
+    # TODO: CRUD 로직 구현 예정
+    """
     @property
     def client(self) -> AsyncIOMotorClient:
-        """비동기 MongoDB 클라이언트를 반환합니다."""
-        return self._client
+        pass
     
     @property
     def sync_client(self) -> MongoClient:
-        """동기 MongoDB 클라이언트를 반환합니다."""
-        return self._sync_client
+        pass
     
     @property
     def db(self) -> AsyncIOMotorDatabase:
-        """데이터베이스 인스턴스를 반환합니다."""
-        return self._db
+        pass
     
     async def close(self):
-        """MongoDB 연결을 종료합니다."""
-        if self._client:
-            self._client.close()
-            self._client = None
-            self._db = None 
+        pass
+    """
 
 
 # # 사용 예시

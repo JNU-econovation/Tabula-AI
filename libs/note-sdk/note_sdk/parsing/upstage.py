@@ -2,12 +2,14 @@ import os
 import time
 import shutil
 import requests
+
 from note_sdk.parsing.base import BaseNode
 from note_sdk.parsing.state import ParseState
 from note_sdk.config import settings
 from common_sdk.config import settings as common_settings
 from common_sdk.get_logger import get_logger
 
+# 로거 설정
 logger = get_logger()
 
 """
