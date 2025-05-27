@@ -30,14 +30,14 @@ template: |
                                               
   Output only pure JSON. No explanations, no markdown, no extra text. 
   JSON format must be:
-  {
+  {{
       "is_wrong": true,
       "feedback": "틀린 이유에 대한 설명"
-  }
+  }}
 
   틀린 내용이 없으면:
-  {
+  {{
       "is_wrong": false,
       "feedback": ""
-  }
+  }}
 input_variables: ["reference_text", "user_text"] 

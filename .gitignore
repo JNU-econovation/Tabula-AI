@@ -1,6 +1,9 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,dotenv,jupyternotebooks
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,dotenv,jupyternotebooks
 
+### macOS ###
+.DS_Store
+
 ### dotenv ###
 .env
 

@@ -10,6 +10,8 @@ packages = [
 python = "^3.11"
 tabula-common-sdk = { path = "../../libs/common-sdk", develop = true }
 tabula-result-sdk = { path = "../../libs/result-sdk", develop = true }
+fastapi = "^0.115.12"
+uvicorn = "^0.34.2"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
