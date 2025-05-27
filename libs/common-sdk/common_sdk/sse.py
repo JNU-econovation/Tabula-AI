@@ -1,26 +1,28 @@
 import json
 import asyncio
+
 from typing import Dict, Any
 from sse_starlette.sse import EventSourceResponse
 
 # 진행률 저장소
 progress_store: Dict[str, Dict[str, Any]] = {}
 
-def update_progress(task_id: str, progress: int, result: Dict[str, Any] = None):
+def update_progress(space_id: str, progress: int, status: Dict[str, Any] = None):
     """진행률 업데이트"""
-    if task_id not in progress_store:
-        progress_store[task_id] = {"progress": 0, "result": None}
+    if space_id not in progress_store:
+        progress_store[space_id] = {"progress": 0, "result": None, "status": None}
     
-    progress_store[task_id]["progress"] = progress
-    if result:
-        progress_store[task_id]["result"] = result
+    progress_store[space_id]["progress"] = progress
+    if status:
+        progress_store[space_id]["status"] = status
 
-async def progress_generator(task_id: str):
+async def progress_generator(space_id: str):
     """SSE 이벤트 생성기"""
     while True:
-        if task_id in progress_store:
-            data = progress_store[task_id]
+        if space_id in progress_store:
+            data = progress_store[space_id]
             progress = data["progress"]
+            status = data.get("status", {})
             
             if progress == 100:
                 # 완료 시 결과물 정보 포함
@@ -32,7 +34,6 @@ async def progress_generator(task_id: str):
                             "progress": 100,
                             "spaceId": data["result"].get("spaceId"),
                             "spaceName": data["result"].get("spaceName"),
-                            "keywords": data["result"].get("keywords")
                         },
                         "error": None
                     })
@@ -45,7 +46,7 @@ async def progress_generator(task_id: str):
                     "data": json.dumps({
                         "success": False,
                         "response": None,
-                        "error": "SSE Error"
+                        "error": status.get("status", "SSE Error")
                     })
                 }
                 break
@@ -57,13 +58,13 @@ async def progress_generator(task_id: str):
                         "success": True,
                         "response": {
                             "progress": progress,
-                            "status": "processing"
+                            "status": status.get("status", "processing")
                         },
                         "error": None
                     })
                 }
         await asyncio.sleep(0.1)
 
-def get_progress_stream(task_id: str):
+def get_progress_stream(space_id: str):
     """진행률 스트림 반환"""
-    return EventSourceResponse(progress_generator(task_id))
+    return EventSourceResponse(progress_generator(space_id))

@@ -1,12 +1,13 @@
 import base64
+
 from fastapi import Depends, Header
 from jose import jwt, ExpiredSignatureError
+
 from common_sdk.config import settings
 from common_sdk.exceptions import InvalidJWT, ExpiredJWT, EmptyJWT
-
 from common_sdk.get_logger import get_logger
 
-# 로그 설정
+# 로거 설정
 logger = get_logger()
 
 
@@ -30,7 +31,7 @@ def get_token_from_header(authorization: str = Header(None)):
 
 
 # Token에서 member id 가져오기
-async def get_current_member(token: str = Depends(get_token_from_header)):
+def get_current_member(token: str = Depends(get_token_from_header)):
     
     if isinstance(token, dict):
         return token

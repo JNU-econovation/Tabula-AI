@@ -1,4 +1,5 @@
 import secrets
+
 from fastapi import Depends, APIRouter, HTTPException
 from fastapi.responses import HTMLResponse
 from fastapi.openapi.docs import get_swagger_ui_html, get_redoc_html

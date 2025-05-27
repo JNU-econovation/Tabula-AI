@@ -1,5 +1,6 @@
-from note_sdk.parsing.state import ParseState
 from abc import ABC, abstractmethod
+
+from note_sdk.parsing.state import ParseState
 
 """
 기본 노드 클래스 정의

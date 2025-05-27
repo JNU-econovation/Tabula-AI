@@ -1,4 +1,5 @@
 import os
+
 from dotenv import load_dotenv
 from pathlib import Path
 
@@ -47,6 +48,7 @@ class Settings:
     # Auth
     JWT_SECRET = os.getenv("JWT_SECRET")
     ALGORITHM = os.getenv("ALGORITHM")
+    TEST_TOKEN = os.getenv("TEST_TOKEN")
 
     # Path setting
     LOG_PATH = os.getenv("LOG_PATH", os.path.join(PROJECT_ROOT, "logs"))

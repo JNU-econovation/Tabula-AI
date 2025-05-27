@@ -1,27 +1,30 @@
 import re 
 import json
-from common_sdk.config import settings as common_settings
-from common_sdk.utils import num_tokens_from_string
-from common_sdk.prompt_loader import PromptLoader
+
 from typing import Dict, Any
 from pathlib import Path
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage 
+
+from common_sdk.config import settings as common_settings
+from common_sdk.utils import num_tokens_from_string
+from common_sdk.prompt_loader import PromptLoader
 from common_sdk.get_logger import get_logger
 
+# 로거 설정
 logger = get_logger()
 
 class KeywordGuide:
-    def __init__(self, domain: str, task_id: str = None, llm_model_name: str = "gpt-4.1-mini", temperature: float = 0):
+    def __init__(self, domain: str, space_id: str = None, llm_model_name: str = "gpt-4.1-mini", temperature: float = 0):
         """
         Args:
             domain: 도메인 타입
-            task_id: 작업 ID
+            space_id: 작업 ID
             llm_model_name: 사용할 LLM 모델 이름
             temperature: LLM의 temperature 값
         """
         self.domain_type = domain
-        self.task_id = task_id
+        self.space_id = space_id
         self.llm = ChatOpenAI(model=llm_model_name, temperature=temperature, openai_api_key=common_settings.OPENAI_API_KEY_J)
 
         # 프롬프트 로더 초기화

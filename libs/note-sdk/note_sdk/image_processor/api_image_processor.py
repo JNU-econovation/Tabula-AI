@@ -1,31 +1,33 @@
 import os
 import io
 import re
-import yaml
 import asyncio
+
+from PIL import Image
 from typing import List, Dict
 from openai import OpenAI
-from common_sdk.config import settings as common_settings
-from note_sdk.config import settings
-from common_sdk.utils import get_embedding
-from PIL import Image
-from tenacity import retry, stop_after_attempt, wait_exponential
-from note_sdk.llm import MultiModal, LLMs
 from langchain_openai import ChatOpenAI
+from tenacity import retry, stop_after_attempt, wait_exponential
+
+from note_sdk.llm import MultiModal, LLMs
+from note_sdk.config import settings
+from common_sdk.config import settings as common_settings
+from common_sdk.utils import get_embedding
 from common_sdk.utils import num_tokens_from_string
 from common_sdk.get_logger import get_logger
 from common_sdk.prompt_loader import PromptLoader
 
+# 로거 설정
 logger = get_logger()
 
 # 이미지 요약 클래스
 class ImageSummary:
-    def __init__(self, task_id: str = None):
+    def __init__(self, space_id: str = None):
         # OpenAI 클라이언트 초기화
         self.client = OpenAI(api_key=common_settings.OPENAI_API_KEY_J)
 
         # 경로 설정
-        self.image_base_path = settings.get_image_dir(task_id)
+        self.image_base_path = settings.get_image_dir(space_id)
         
         # 프롬프트 로더 초기화
         self.prompt_loader = PromptLoader()
