@@ -85,3 +85,5 @@ class MissingAnalysisWorkflow:
             "missing_items": result["missing_items"],
             "api_response": result.get("api_response")
         }
+    
+    # 키워드 분석 결과 MongoDB 저장
