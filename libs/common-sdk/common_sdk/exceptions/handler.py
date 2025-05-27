@@ -8,7 +8,7 @@ from common_sdk.exceptions import (
     MissingTaskId, TaskIdNotFound
 )
 from common_sdk.exceptions import (
-    FileAccessError
+    ExternalConnectionError, UploadFailedError
 )
 
 # 서버 예외 핸들러
@@ -35,7 +35,8 @@ async def business_exception_handler(request: Request, exc: HTTPException):
 
 def register_exception_handlers(app: FastAPI):
     # 서버 예외 핸들러 등록
-    app.add_exception_handler(FileAccessError, server_exception_handler)
+    app.add_exception_handler(ExternalConnectionError, server_exception_handler)
+    app.add_exception_handler(UploadFailedError, server_exception_handler)
     
 
     # 비즈니스 예외 핸들러 등록

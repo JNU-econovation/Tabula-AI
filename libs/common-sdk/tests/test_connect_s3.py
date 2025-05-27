@@ -1,4 +1,4 @@
-from common_sdk.conn.s3 import S3Storage
+from common_sdk.crud.s3 import S3Storage
 from common_sdk.config import settings
 
 # S3 연결 상태 테스트

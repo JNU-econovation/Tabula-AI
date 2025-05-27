@@ -22,12 +22,12 @@ logger = get_logger()
 
 # 이미지 요약 클래스
 class ImageSummary:
-    def __init__(self, task_id: str = None):
+    def __init__(self, space_id: str = None):
         # OpenAI 클라이언트 초기화
         self.client = OpenAI(api_key=common_settings.OPENAI_API_KEY_J)
 
         # 경로 설정
-        self.image_base_path = settings.get_image_dir(task_id)
+        self.image_base_path = settings.get_image_dir(space_id)
         
         # 프롬프트 로더 초기화
         self.prompt_loader = PromptLoader()

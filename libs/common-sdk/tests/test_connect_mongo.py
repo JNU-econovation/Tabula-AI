@@ -1,4 +1,4 @@
-from common_sdk.conn.mongodb import MongoDB
+from common_sdk.crud.mongodb import MongoDB
 from common_sdk.config import settings
 
 # MongoDB 연결 테스트

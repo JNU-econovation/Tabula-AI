@@ -16,16 +16,16 @@ logger = get_logger()
 
 
 class VectorLoader:
-    def __init__(self, language: Literal["ko", "en"], task_id: str = None):
+    def __init__(self, language: Literal["ko", "en"], space_id: str = None):
         """
         Args:
             language: 언어 설정 (ko / en)
-            task_id: 작업 ID
+            space_id: 작업 ID
         
         VectorLoader 초기화
         """
         self.language = language
-        self.task_id = task_id
+        self.space_id = space_id
         
         # Pinecone 클라이언트 초기화(language에 따른 API KEY 설정)
         self.pc = Pinecone(api_key=settings.PINECONE_API_KEY)

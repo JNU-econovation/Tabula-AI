@@ -18,49 +18,49 @@ class Settings:
     INDEX_NAME_ENG_SPA_CONTENTS = os.getenv("INDEX_NAME_ENG_SPA_CONTENTS")
 
     # 기본 설정
-    TASK_DIR = os.path.join(NOTE_SDK_ROOT, "task")
+    SPACE_DIR = os.path.join(NOTE_SDK_ROOT, "space")
 
     # 작업 디렉토리 구조
     @staticmethod
-    def get_task_dir(task_id: str) -> Path:
+    def get_space_dir(space_id: str) -> Path:
         """사용자별 작업 디렉토리 경로 반환"""
-        return Path(Settings.TASK_DIR) / task_id
+        return Path(Settings.SPACE_DIR) / space_id
 
     @staticmethod
-    def get_markdown_path(task_id: str, document_id: str) -> Path:
+    def get_markdown_path(space_id: str, document_id: str) -> Path:
         """마크다운 파일 경로 반환"""
-        return Path(Settings.TASK_DIR) / task_id / "md" / f"{document_id}.md"
+        return Path(Settings.SPACE_DIR) / space_id / "md" / f"{document_id}.md"
 
     @staticmethod
-    def get_image_dir(task_id: str) -> Path:
+    def get_image_dir(space_id: str) -> Path:
         """이미지 디렉토리 경로 반환"""
-        return Path(Settings.TASK_DIR) / task_id / "images"
+        return Path(Settings.SPACE_DIR) / space_id / "images"
 
     @staticmethod
-    def get_keyword_path(task_id: str, document_id: str) -> Path:
+    def get_keyword_path(space_id: str, document_id: str) -> Path:
         """키워드 파일 경로 반환"""
-        return Path(Settings.TASK_DIR) / task_id / "keyword" / f"{document_id}.json"
+        return Path(Settings.SPACE_DIR) / space_id / "keyword" / f"{document_id}.json"
     
     @staticmethod
-    def get_origin_dir(task_id: str) -> Path:
+    def get_origin_dir(space_id: str) -> Path:
         """원본 파일 디렉토리 경로 반환"""
-        return Path(Settings.TASK_DIR) / task_id / "origin"
+        return Path(Settings.SPACE_DIR) / space_id / "origin"
 
     @staticmethod
-    def get_temp_dir(task_id: str) -> Path:
+    def get_temp_dir(space_id: str) -> Path:
         """임시 디렉토리 경로 반환"""
-        temp_dir = Path(Settings.TASK_DIR) / task_id / "temp"
+        temp_dir = Path(Settings.SPACE_DIR) / space_id / "temp"
         return temp_dir
 
     @staticmethod
-    def ensure_user_directories(task_id: str) -> None:
+    def ensure_user_directories(space_id: str) -> None:
         """사용자별 필요한 디렉토리 생성"""
         directories = [
-            Path(Settings.TASK_DIR) / task_id / "md",
-            Path(Settings.TASK_DIR) / task_id / "images",
-            Path(Settings.TASK_DIR) / task_id / "keyword",
-            Path(Settings.TASK_DIR) / task_id / "origin",
-            Path(Settings.TASK_DIR) / task_id / "temp"
+            Path(Settings.SPACE_DIR) / space_id / "md",
+            Path(Settings.SPACE_DIR) / space_id / "images",
+            Path(Settings.SPACE_DIR) / space_id / "keyword",
+            Path(Settings.SPACE_DIR) / space_id / "origin",
+            Path(Settings.SPACE_DIR) / space_id / "temp"
         ]
         for directory in directories:
             directory.mkdir(parents=True, exist_ok=True)
