@@ -31,7 +31,7 @@ def get_token_from_header(authorization: str = Header(None)):
 
 
 # Token에서 member id 가져오기
-async def get_current_member(token: str = Depends(get_token_from_header)):
+def get_current_member(token: str = Depends(get_token_from_header)):
     
     if isinstance(token, dict):
         return token
