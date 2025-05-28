@@ -14,7 +14,10 @@ class Settings:
 
         # Pinecone 설정
         self.PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-        self.INDEX_NAME = os.getenv("INDEX_NAME")
+        self.INDEX_NAME_KOR_DEN_CONTENTS = os.getenv("INDEX_NAME_KOR_DEN_CONTENTS")
+        self.INDEX_NAME_ENG_DEN_CONTENTS = os.getenv("INDEX_NAME_ENG_DEN_CONTENTS")
+        self.INDEX_NAME_KOR_SPA_CONTENTS = os.getenv("INDEX_NAME_KOR_SPA_CONTENTS")
+        self.INDEX_NAME_ENG_SPA_CONTENTS = os.getenv("INDEX_NAME_ENG_SPA_CONTENTS")
 
         # OpenAI 설정
         self.OPENAI_API_KEY_J = os.getenv("OPENAI_API_KEY_J")
