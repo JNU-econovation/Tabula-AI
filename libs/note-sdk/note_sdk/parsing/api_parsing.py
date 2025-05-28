@@ -27,9 +27,7 @@ def parse_document(file: str, config: ParseConfig) -> Dict[str, Any]:
         config: 파싱 설정 객체
     """
 
-    logger.info(f"Parsing file: {file}")
-    logger.info(f"Parsing language: {config.language}")
-    logger.info(f"Parsing domain: {config.domain_type}")
+    logger.info(f"[parse_document] Parsing file: {file} (language: {config.language}, domain: {config.domain_type})")
 
     # 파서 그래프 생성
     parser_graph = create_document_parse_graph(
@@ -53,9 +51,6 @@ def parse_document(file: str, config: ParseConfig) -> Dict[str, Any]:
         "filetype": "pdf",
         "include_image_in_output": True
     }
-
-    # 파서 실행
-    logger.info(f"Parsing: '{file}'")
 
     result = parser_graph.invoke(inputs, config=run_config)
     return result

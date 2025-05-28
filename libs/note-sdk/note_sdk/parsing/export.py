@@ -90,5 +90,5 @@ class ExportMarkdown(BaseNode):
                 else:
                     f.write(elem["content"]["markdown"] + self.separator)
 
-        logger.info(f"Markdown file successfully created: {md_path}")
+        logger.info(f"[ExportMarkdown] Markdown file successfully created: {md_path}")
         return {"export": [str(md_path)]}

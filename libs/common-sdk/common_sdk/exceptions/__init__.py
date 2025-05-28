@@ -8,4 +8,6 @@ __all__ = ['InvalidJWT', 'ExpiredJWT', 'EmptyJWT',
            'MissingResultFileData', 'UnsupportedResultFileFormat', 'ResultFileSizeExceeded', 'ResultFileUploadPageExceeded',
            'MissingSpaceId', 'SpaceIdNotFound',
            'FileAccessError',
+           'ExternalConnectionError', 'UploadFailedError', 'FileNotFoundError', 'ImageProcessingError',
+           'KeywordProcessingError',
            'register_exception_handlers'] 

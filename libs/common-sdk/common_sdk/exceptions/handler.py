@@ -8,7 +8,8 @@ from common_sdk.exceptions import (
     MissingSpaceId, SpaceIdNotFound
 )
 from common_sdk.exceptions import (
-    ExternalConnectionError, UploadFailedError
+    ExternalConnectionError, UploadFailedError, FileNotFoundError, ImageProcessingError,
+    KeywordProcessingError, APIKeyError
 )
 
 # 서버 예외 핸들러
@@ -37,6 +38,10 @@ def register_exception_handlers(app: FastAPI):
     # 서버 예외 핸들러 등록
     app.add_exception_handler(ExternalConnectionError, server_exception_handler)
     app.add_exception_handler(UploadFailedError, server_exception_handler)
+    app.add_exception_handler(FileNotFoundError, server_exception_handler)
+    app.add_exception_handler(ImageProcessingError, server_exception_handler)
+    app.add_exception_handler(KeywordProcessingError, server_exception_handler)
+    app.add_exception_handler(APIKeyError, server_exception_handler)
     
 
     # 비즈니스 예외 핸들러 등록

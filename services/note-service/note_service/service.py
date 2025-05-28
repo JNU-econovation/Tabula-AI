@@ -11,7 +11,9 @@ from note_sdk.vector_store import VectorLoader
 from common_sdk.sse import update_progress
 from common_sdk.crud.mongodb import MongoDB
 from note_sdk.config import settings
+from common_sdk.exceptions import FileNotFoundError
 from common_sdk.get_logger import get_logger
+from common_sdk.constants import ProgressPhase, ProgressRange, StatusMessage
 
 # 로거 설정
 logger = get_logger()
@@ -51,10 +53,10 @@ class NoteService:
             logger.info(f"User: {self.user_id} Start Document Processing: {self.space_id}")
             
             # 1. PDF 파싱 (0% - 30%)
-            logger.info("=== Starting PDF Parsing ===")
-            self.current_progress = 0
+            logger.info(f"[NoteService] User: {self.user_id} - Starting PDF Parsing")
+            self.current_progress = ProgressRange.PDF_PARSING[0]
             update_progress(self.space_id, self.current_progress, {
-                "status": "PDF 파싱 시작",
+                "status": StatusMessage.PDF_PARSING,
                 "result": {"spaceId": self.space_id}
             })
             
@@ -66,45 +68,43 @@ class NoteService:
             })
             
             await self.parse_pdf()
-            self.current_progress = 30
+            self.current_progress = ProgressRange.PDF_PARSING[1]
             update_progress(self.space_id, self.current_progress, {
-                "status": "PDF 파싱 완료",
+                "status": f"{ProgressPhase.PDF_PARSING} 완료",
                 "result": {"spaceId": self.space_id}
             })
-            logger.info("=== PDF Parsing completed ===")
+            logger.info(f"[NoteService] User: {self.user_id} - PDF Parsing completed")
             
             # 2. 마크다운 처리 및 벡터DB 적재 (30% - 60%)
-            logger.info("=== Starting Markdown Processing ===")
-            self.current_progress = 30
+            logger.info(f"[NoteService] User: {self.user_id} - Starting Markdown Processing")
+            self.current_progress = ProgressRange.MARKDOWN_PROCESSING[0]
             update_progress(self.space_id, self.current_progress, {
-                "status": "마크다운 처리 시작",
+                "status": StatusMessage.MARKDOWN_PROCESSING,
                 "result": {"spaceId": self.space_id}
             })
             
-            success = await self.process_markdown()
-            if not success:
-                raise Exception("Markdown Processing Failed")
+            await self.process_markdown()
             
-            self.current_progress = 60
+            self.current_progress = ProgressRange.MARKDOWN_PROCESSING[1]
             update_progress(self.space_id, self.current_progress, {
-                "status": "마크다운 처리 완료",
+                "status": f"{ProgressPhase.MARKDOWN_PROCESSING} 완료",
                 "result": {"spaceId": self.space_id}
             })
             
             # 3. 키워드 생성 (60% - 90%)
-            logger.info("=== Starting Keyword Generation ===")
-            self.current_progress = 60
+            logger.info(f"[NoteService] User: {self.user_id} - Starting Keyword Generation")
+            self.current_progress = ProgressRange.KEYWORD_GENERATION[0]
             update_progress(self.space_id, self.current_progress, {
-                "status": "키워드 생성 시작",
+                "status": StatusMessage.KEYWORD_GENERATION,
                 "result": {"spaceId": self.space_id}
             })
             
             keyword_result = await self.generate_keywords()
             self.keyword_result = keyword_result
             
-            self.current_progress = 90
+            self.current_progress = ProgressRange.KEYWORD_GENERATION[1]
             update_progress(self.space_id, self.current_progress, {
-                "status": "키워드 생성 완료",
+                "status": f"{ProgressPhase.KEYWORD_GENERATION} 완료",
                 "result": {"spaceId": self.space_id}
             })
 
@@ -113,36 +113,31 @@ class NoteService:
             keywords = keyword_result.get("mindmap", [])
 
             # 4. MongoDB에 공간 저장 (90% - 100%)
-            logger.info("=== Saving to MongoDB ===")
-            self.current_progress = 90
+            logger.info(f"[NoteService] User: {self.user_id} - Saving to MongoDB")
+            self.current_progress = ProgressRange.DB_STORAGE[0]
             update_progress(self.space_id, self.current_progress, {
-                "status": "MongoDB 저장 중",
+                "status": StatusMessage.DB_STORAGE,
                 "result": {"spaceId": self.space_id}
             })
             
-            try:
-                logger.info(f"MongoDB 저장 시작 - space_id: {self.space_id}")
-                
-                mongodb.create_space(
-                    space_id=self.space_id,
-                    folder_id=self.folder_id,
-                    file_url=self.s3_url,
-                    file_name=self.file_name,
-                    lang_type=self.language,
-                    file_domain=self.domain_type,
-                    space_name=space_name,
-                    keywords=keywords
-                )
-                logger.info(f"MongoDB 저장 성공 - space_id: {self.space_id}")
-            except Exception as e:
-                logger.error(f"MongoDB 저장 실패: {str(e)}")
-                raise Exception(f"MongoDB 저장 실패: {str(e)}")
+            mongodb.create_space(
+                user_id=self.user_id,
+                space_id=self.space_id,
+                folder_id=self.folder_id,
+                file_url=self.s3_url,
+                file_name=self.file_name,
+                lang_type=self.language,
+                file_domain=self.domain_type,
+                space_name=space_name,
+                keywords=keywords
+            )
+            logger.info(f"[NoteService] User: {self.user_id} - MongoDB save Success")
 
             # 5. SSE 완료 (100%)
-            logger.info("=== Processing Completed ===")
+            logger.info(f"[NoteService] User: {self.user_id} - Processing Completed")
             self.current_progress = 100
             update_progress(self.space_id, self.current_progress, {
-                "status": "처리 완료",
+                "status": StatusMessage.COMPLETE,
                 "result": {
                     "spaceId": self.space_id,
                     "spaceName": space_name
@@ -150,22 +145,33 @@ class NoteService:
             })
             
             # 6. 백그라운드 작업 시작 (SSE 종료 후)
-            logger.info("=== Starting Background Tasks ===")
+            logger.info(f"[NoteService] User: {self.user_id} - Starting Background Tasks")
             
-            # 6.1 이미지 처리
-            logger.info("=== Starting Image Processing ===")
-            await self.process_images_background()
-            
-            # 6.2 작업 디렉토리 정리
-            self.cleanup_task_directory(self.space_dir)
+            try:
+                # 6.1 이미지 처리
+                logger.info(f"[NoteService] User: {self.user_id} - Starting Image Processing")
+                await self.process_images_background()
+                logger.info(f"[NoteService] User: {self.user_id} - Image Processing Completed")
+                
+                # 6.2 작업 디렉토리 정리 (모든 작업이 완료된 후)
+                self.cleanup_task_directory(self.space_dir)
+                logger.info(f"[NoteService] User: {self.user_id} - Finished Background Tasks")
+                
+            except Exception as e:
+                logger.error(f"[NoteService] User: {self.user_id} - Error in background tasks: {str(e)}")
+                # 백그라운드 작업 실패 시에도 디렉토리 정리 시도
+                self.cleanup_task_directory(self.space_dir)
+                raise
             
         except Exception as e:
-            logger.error(f"Error occurred during document processing: {str(e)}")
+            logger.error(f"[NoteService] User: {self.user_id} - Error occurred during document processing: {str(e)}")
             self.current_progress = -1
             update_progress(self.space_id, self.current_progress, {
-                "status": f"에러 발생: {str(e)}",
+                "status": f"{StatusMessage.ERROR}: {str(e)}",
                 "result": {"spaceId": self.space_id}
             })
+            # 에러 발생 시에도 디렉토리 정리 시도
+            self.cleanup_task_directory(self.space_dir)
             raise
 
     # 작업 완료 후 디렉토리 정리: common-sdk로 이전 예정
@@ -173,94 +179,83 @@ class NoteService:
         try:
             if space_dir.exists():
                 shutil.rmtree(space_dir)
-                logger.info(f"Cleaned up task directory: {space_dir}")
+                logger.info(f"[NoteService] User: {self.user_id} - Cleaned up task directory: {space_dir}")
         except Exception as e:
-            logger.error(f"Error cleaning up task directory: {str(e)}")
+            logger.error(f"[NoteService] User: {self.user_id} - Error cleaning up task directory: {str(e)}")
 
     # PDF 파싱 로직
     async def parse_pdf(self):
-        try:
-            config = ParseConfig(
-                language=self.language,
-                domain_type=self.domain_type,
-                output_dir=str(self.space_dir),
-                space_id=self.space_id,
-            )
-            parsed_data = parse_document(self.pdf, config)
-            if not parsed_data:
-                raise Exception(f"PDF Parsing Failed: {self.pdf}")
-            return parsed_data
-        except Exception as e:
-            logger.error(f"PDF Parsing Error: {str(e)}")
-            raise
+
+        config = ParseConfig(
+            language=self.language,
+            domain_type=self.domain_type,
+            output_dir=str(self.space_dir),
+            space_id=self.space_id,
+        )
+        parsed_data = parse_document(self.pdf, config)
+
+        return parsed_data
 
     # 마크다운 처리 로직
     async def process_markdown(self):
-        try:
-            md_path = self.md_dir / f"{self.document_id}.md"
-            if not md_path.exists():
-                raise FileNotFoundError(f"Markdown file not found: {md_path}")
-            
-            with open(md_path, 'r', encoding='utf-8') as f:
-                content = f.read()
-            
-            # 마크다운 처리 시작 (40%)
-            self.current_progress = 40
-            update_progress(self.space_id, self.current_progress, {"status": "마크다운 처리 시작"})
-            
-            # 벡터 DB 적재(50%)
-            self.current_progress = 50
-            update_progress(self.space_id, self.current_progress, {"status": "벡터 DB 적재 중"})
-            
-            success = await self.vector_loader.process_markdown(content, self.document_id)
-            if not success:
-                raise Exception("Markdown Vector Database Loading Failed")
-            
-            # 벡터 DB 적재 완료 (60%)
-            self.current_progress = 60
-            update_progress(self.space_id, self.current_progress, {"status": "벡터 DB 적재 완료"})
-            
-            # 벡터 DB 적재 후 딜레이 (2초)
-            await asyncio.sleep(2)
-            
-            return success
-        except Exception as e:
-            logger.error(f"Markdown Processing Error: {str(e)}")
-            raise
+        
+        md_path = self.md_dir / f"{self.document_id}.md"
+
+        if not md_path.exists():
+            logger.error(f"[NoteService] User: {self.user_id} - Markdown file not found: {md_path}")
+            raise FileNotFoundError(md_path)
+        
+        with open(md_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+        
+        # 마크다운 처리 시작 (40%)
+        self.current_progress = 40
+        update_progress(self.space_id, self.current_progress, {"status": "마크다운 처리 시작"})
+        
+        # 벡터 DB 적재(50%)
+        self.current_progress = 50
+        update_progress(self.space_id, self.current_progress, {"status": "벡터 DB 적재 중"})
+        
+        success = await self.vector_loader.process_markdown(content, self.document_id)
+        
+        # 벡터 DB 적재 완료 (60%)
+        self.current_progress = 60
+        update_progress(self.space_id, self.current_progress, {"status": "벡터 DB 적재 완료"})
+        
+        # 벡터 DB 적재 후 딜레이 (2초)
+        await asyncio.sleep(2)
+        
+        return success
 
     # 키워드 생성 로직
     async def generate_keywords(self):
-        try:
-            md_path = self.md_dir / f"{self.document_id}.md"
+        md_path = self.md_dir / f"{self.document_id}.md"
+        
+        # 키워드 생성 시작 (70%)
+        self.current_progress = 70
+        update_progress(self.space_id, self.current_progress, {"status": "키워드 생성 시작"})
+        
+        keyword_result = self.keyword_guide.generate_mindmap_from_markdown(str(md_path))
+        
+        if keyword_result:
+            # 키워드 저장 (80%)
+            self.current_progress = 80
+            update_progress(self.space_id, self.current_progress, {"status": "키워드 저장 중"})
             
-            # 키워드 생성 시작 (70%)
-            self.current_progress = 70
-            update_progress(self.space_id, self.current_progress, {"status": "키워드 생성 시작"})
+            keyword_path = settings.get_keyword_path(self.space_id, self.document_id)
+            keyword_path.parent.mkdir(exist_ok=True)
             
-            keyword_result = self.keyword_guide.generate_mindmap_from_markdown(str(md_path))
-            
-            if keyword_result:
-                # 키워드 저장 (80%)
-                self.current_progress = 80
-                update_progress(self.space_id, self.current_progress, {"status": "키워드 저장 중"})
-                
-                keyword_path = settings.get_keyword_path(self.space_id, self.document_id)
-                keyword_path.parent.mkdir(exist_ok=True)
-                
-                with open(keyword_path, 'w', encoding='utf-8') as f:
-                    json.dump(keyword_result, f, indent=2, ensure_ascii=False)
-            
-            # 키워드 생성 완료(90%)
-            self.current_progress = 90
-            update_progress(self.space_id, self.current_progress, {"status": "키워드 생성 완료"})
-            
-            # 키워드 생성 후 딜레이 (2초)
-            await asyncio.sleep(2)
+            with open(keyword_path, 'w', encoding='utf-8') as f:
+                json.dump(keyword_result, f, indent=2, ensure_ascii=False)
+        
+        # 키워드 생성 완료(90%)
+        self.current_progress = 90
+        update_progress(self.space_id, self.current_progress, {"status": "키워드 생성 완료"})
+        
+        # 키워드 생성 후 딜레이 (2초)
+        await asyncio.sleep(2)
 
-            return keyword_result
-        except Exception as e:
-            logger.error(f"Keyword Generation Error: {str(e)}")
-            raise
+        return keyword_result
 
     # 이미지 처리 로직
     async def process_images_background(self):
@@ -271,17 +266,10 @@ class NoteService:
             
             image_result = await self.image_summary.process_markdown(content, self.document_id)
             
-            if image_result and "objects" in image_result:
-                # 이미지 처리 전 딜레이 (2초)
-                await asyncio.sleep(2)
-
-                await self.vector_loader.process_images(image_result["objects"], self.document_id)
-
-                # 이미지 처리 후 딜레이 (2초)
-                await asyncio.sleep(2)
-                
-            logger.info(f"Background image processing completed for {self.document_id}")
-            return True
+            # 이미지 처리 완료
+            logger.info(f"[NoteService] User: {self.user_id} - Image Processing Completed")
+            return image_result
+            
         except Exception as e:
-            logger.error(f"Background Image Processing Error: {str(e)}")
+            logger.error(f"[NoteService] User: {self.user_id} - Background Image Processing Error: {str(e)}")
             return False

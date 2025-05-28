@@ -5,18 +5,19 @@ from typing import Dict, Any
 from sse_starlette.sse import EventSourceResponse
 
 from common_sdk.get_logger import get_logger
+from common_sdk.constants import ProgressPhase, ProgressRange, StatusMessage
 
 logger = get_logger()
 
 # 진행률 저장소
 progress_store: Dict[str, Dict[str, Any]] = {}
 
+# 진행률 업데이트
 def update_progress(space_id: str, progress: int, status: Dict[str, Any] = None):
-    """진행률 업데이트"""
     if space_id not in progress_store:
         progress_store[space_id] = {
             "progress": 0,
-            "status": {"status": "처리 시작"},
+            "status": {"status": StatusMessage.INITIAL},
             "result": {"spaceId": space_id}
         }
     
@@ -26,17 +27,21 @@ def update_progress(space_id: str, progress: int, status: Dict[str, Any] = None)
         if "result" in status:
             progress_store[space_id]["result"] = status["result"]
 
-async def progress_generator(space_id: str):
-    """SSE 이벤트 생성기"""
-    # 초기 상태 설정
-    if space_id not in progress_store:
-        progress_store[space_id] = {
-            "progress": 0,
-            "status": {"status": "처리 시작"},
-            "result": {"spaceId": space_id}
-        }
-    
+async def progress_generator(space_id: str, service: Any = None):
     try:
+        # 1. 초기 상태 확인
+        if space_id not in progress_store:
+            update_progress(space_id, 0, {
+                "status": StatusMessage.INITIAL,
+                "result": {"spaceId": space_id}
+            })
+        
+        # 2. 처리 시작
+        if service:
+            # 비동기 처리 시작
+            asyncio.create_task(service.process_document())
+        
+        # 3. SSE 연결 시작
         while True:
             if space_id in progress_store:
                 data = progress_store[space_id]
@@ -44,8 +49,8 @@ async def progress_generator(space_id: str):
                 status = data.get("status", {})
                 result = data.get("result", {})
                 
+                # 4. 진행 상태에 따른 이벤트 전송
                 if progress == 100:
-                    # 완료 시 결과물 정보 포함
                     yield {
                         "event": "complete",
                         "data": json.dumps({
@@ -60,27 +65,26 @@ async def progress_generator(space_id: str):
                     }
                     break
                 elif progress == -1:
-                    # 에러 발생
                     yield {
                         "event": "error",
                         "data": json.dumps({
                             "success": False,
                             "response": None,
-                            "error": status.get("status", "SSE Error")
+                            "error": status.get("status", StatusMessage.ERROR)
                         })
                     }
                     break
                 else:
                     # 진행 중인 경우
-                    status_message = status.get("status", "processing")
-                    if progress <= 30:
-                        phase = "PDF 파싱"
-                    elif progress <= 60:
-                        phase = "마크다운 처리"
-                    elif progress <= 90:
-                        phase = "키워드 생성"
+                    status_message = status.get("status", "처리 중")
+                    if progress <= ProgressRange.PDF_PARSING[1]:
+                        phase = ProgressPhase.PDF_PARSING
+                    elif progress <= ProgressRange.MARKDOWN_PROCESSING[1]:
+                        phase = ProgressPhase.MARKDOWN_PROCESSING
+                    elif progress <= ProgressRange.KEYWORD_GENERATION[1]:
+                        phase = ProgressPhase.KEYWORD_GENERATION
                     else:
-                        phase = "MongoDB 적재"
+                        phase = ProgressPhase.DB_STORAGE
                     
                     yield {
                         "event": "progress",
@@ -96,8 +100,9 @@ async def progress_generator(space_id: str):
                         })
                     }
             await asyncio.sleep(0.1)
+            
     except Exception as e:
-        logger.error(f"SSE Error: {str(e)}")
+        logger.error(f"[progress_generator] SSE Error: {str(e)}")
         yield {
             "event": "error",
             "data": json.dumps({
@@ -107,6 +112,6 @@ async def progress_generator(space_id: str):
             })
         }
 
-def get_progress_stream(space_id: str):
+def get_progress_stream(space_id: str, service: Any = None):
     """진행률 스트림 반환"""
-    return EventSourceResponse(progress_generator(space_id))
+    return EventSourceResponse(progress_generator(space_id, service))
