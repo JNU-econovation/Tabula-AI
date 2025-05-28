@@ -6,6 +6,6 @@ __all__ = ['InvalidJWT', 'ExpiredJWT', 'EmptyJWT',
            'MissingFieldData',
            'MissingNoteFileData', 'UnsupportedNoteFileFormat', 'NoteFileSizeExceeded',
            'MissingResultFileData', 'UnsupportedResultFileFormat', 'ResultFileSizeExceeded', 'ResultFileUploadPageExceeded',
-           'MissingTaskId', 'TaskIdNotFound',
+           'MissingSpaceId', 'SpaceIdNotFound',
            'FileAccessError',
            'register_exception_handlers'] 

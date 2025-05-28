@@ -5,7 +5,7 @@ from common_sdk.exceptions import (
     MissingFieldData,
     MissingNoteFileData, UnsupportedNoteFileFormat, NoteFileSizeExceeded,
     MissingResultFileData, UnsupportedResultFileFormat, ResultFileSizeExceeded, ResultFileUploadPageExceeded,
-    MissingTaskId, TaskIdNotFound
+    MissingSpaceId, SpaceIdNotFound
 )
 from common_sdk.exceptions import (
     ExternalConnectionError, UploadFailedError
@@ -51,5 +51,5 @@ def register_exception_handlers(app: FastAPI):
     app.add_exception_handler(UnsupportedResultFileFormat, business_exception_handler)
     app.add_exception_handler(ResultFileSizeExceeded, business_exception_handler)
     app.add_exception_handler(ResultFileUploadPageExceeded, business_exception_handler)
-    app.add_exception_handler(MissingTaskId, business_exception_handler)
-    app.add_exception_handler(TaskIdNotFound, business_exception_handler)
+    app.add_exception_handler(MissingSpaceId, business_exception_handler)
+    app.add_exception_handler(SpaceIdNotFound, business_exception_handler)

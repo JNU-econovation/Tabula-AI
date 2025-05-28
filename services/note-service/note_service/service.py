@@ -21,7 +21,7 @@ mongodb = MongoDB()
 
 # 학습 자료 업로드 클래스
 class NoteService:
-    def __init__(self, pdf: str, folder_id: str, language: str, domain_type: str, space_id: str, s3_url: str, file_name: str):
+    def __init__(self, pdf: str, folder_id: str, language: str, domain_type: str, space_id: str, s3_url: str, file_name: str, user_id: int):
         self.pdf = pdf # PDF 파일 경로
         self.folder_id = folder_id # 폴더 아이디
         self.language = language # 언어 설정
@@ -29,6 +29,7 @@ class NoteService:
         self.space_id = space_id # 작업 아이디
         self.s3_url = s3_url # S3 URL
         self.file_name = file_name # 파일명
+        self.user_id = user_id # 사용자 아이디
         self.document_id = Path(pdf).stem # 파일명 추출(확장자 제외)
         self.space_dir = settings.get_space_dir(space_id) # 작업 디렉토리 경로
         
@@ -49,62 +50,122 @@ class NoteService:
         try:
             logger.info(f"User: {self.user_id} Start Document Processing: {self.space_id}")
             
-            # 1. PDF 파싱 (10% - 30%)
+            # 1. PDF 파싱 (0% - 30%)
             logger.info("=== Starting PDF Parsing ===")
+            self.current_progress = 0
+            update_progress(self.space_id, self.current_progress, {
+                "status": "PDF 파싱 시작",
+                "result": {"spaceId": self.space_id}
+            })
+            
+            # 임시 디렉토리 생성 (10%)
             self.current_progress = 10
-            update_progress(self.space_id, self.current_progress, {"status": "PDF 파싱 시작"})
+            update_progress(self.space_id, self.current_progress, {
+                "status": "임시 디렉토리 생성",
+                "result": {"spaceId": self.space_id}
+            })
             
             await self.parse_pdf()
             self.current_progress = 30
-            update_progress(self.space_id, self.current_progress, {"status": "PDF 파싱 완료"})
+            update_progress(self.space_id, self.current_progress, {
+                "status": "PDF 파싱 완료",
+                "result": {"spaceId": self.space_id}
+            })
             logger.info("=== PDF Parsing completed ===")
-
-            # 파싱 후 딜레이 (2초)
-            await asyncio.sleep(2)
             
-            # 2. 파싱 결과를 기반으로 비동기 작업 시작
-            logger.info("=== Starting Parallel Processing ===")
-            # 마크다운 처리와 키워드 생성만 진행률에 포함
-            tasks = [
-                self.process_markdown(),  # 마크다운 처리 및 벡터 DB 적재
-                self.generate_keywords(),  # 키워드 생성
-            ]
+            # 2. 마크다운 처리 및 벡터DB 적재 (30% - 60%)
+            logger.info("=== Starting Markdown Processing ===")
+            self.current_progress = 30
+            update_progress(self.space_id, self.current_progress, {
+                "status": "마크다운 처리 시작",
+                "result": {"spaceId": self.space_id}
+            })
             
-            # 마크다운 처리 / 키워드 생성은 SSE 포함
-            _, keyword_result = await asyncio.gather(*tasks)
+            success = await self.process_markdown()
+            if not success:
+                raise Exception("Markdown Processing Failed")
+            
+            self.current_progress = 60
+            update_progress(self.space_id, self.current_progress, {
+                "status": "마크다운 처리 완료",
+                "result": {"spaceId": self.space_id}
+            })
+            
+            # 3. 키워드 생성 (60% - 90%)
+            logger.info("=== Starting Keyword Generation ===")
+            self.current_progress = 60
+            update_progress(self.space_id, self.current_progress, {
+                "status": "키워드 생성 시작",
+                "result": {"spaceId": self.space_id}
+            })
+            
+            keyword_result = await self.generate_keywords()
             self.keyword_result = keyword_result
+            
+            self.current_progress = 90
+            update_progress(self.space_id, self.current_progress, {
+                "status": "키워드 생성 완료",
+                "result": {"spaceId": self.space_id}
+            })
 
             # 키워드 결과 추출
             space_name = keyword_result.get("spaceName", self.document_id)
             keywords = keyword_result.get("mindmap", [])
 
-            # 3. 완료 (100%)
+            # 4. MongoDB에 공간 저장 (90% - 100%)
+            logger.info("=== Saving to MongoDB ===")
+            self.current_progress = 90
+            update_progress(self.space_id, self.current_progress, {
+                "status": "MongoDB 저장 중",
+                "result": {"spaceId": self.space_id}
+            })
+            
+            try:
+                logger.info(f"MongoDB 저장 시작 - space_id: {self.space_id}")
+                
+                mongodb.create_space(
+                    space_id=self.space_id,
+                    folder_id=self.folder_id,
+                    file_url=self.s3_url,
+                    file_name=self.file_name,
+                    lang_type=self.language,
+                    file_domain=self.domain_type,
+                    space_name=space_name,
+                    keywords=keywords
+                )
+                logger.info(f"MongoDB 저장 성공 - space_id: {self.space_id}")
+            except Exception as e:
+                logger.error(f"MongoDB 저장 실패: {str(e)}")
+                raise Exception(f"MongoDB 저장 실패: {str(e)}")
+
+            # 5. SSE 완료 (100%)
             logger.info("=== Processing Completed ===")
             self.current_progress = 100
+            update_progress(self.space_id, self.current_progress, {
+                "status": "처리 완료",
+                "result": {
+                    "spaceId": self.space_id,
+                    "spaceName": space_name
+                }
+            })
             
-            # MongoDB에 공간 저장
-            mongodb.create_space(
-                space_id=self.space_id,
-                folder_id=self.folder_id,
-                file_url=self.s3_url,
-                file_name=self.file_name,
-                lang_type=self.language,
-                file_domain=self.domain_type,
-                space_name=space_name,
-                keywords=keywords
-            )
-
-            # 4. 이미지 처리 (백그라운드 실행)
+            # 6. 백그라운드 작업 시작 (SSE 종료 후)
+            logger.info("=== Starting Background Tasks ===")
+            
+            # 6.1 이미지 처리
             logger.info("=== Starting Image Processing ===")
             await self.process_images_background()
-
-            # 5. 작업 디렉토리 정리
+            
+            # 6.2 작업 디렉토리 정리
             self.cleanup_task_directory(self.space_dir)
             
         except Exception as e:
             logger.error(f"Error occurred during document processing: {str(e)}")
             self.current_progress = -1
-            update_progress(self.space_id, self.current_progress, {"status": f"에러 발생: {str(e)}"})
+            update_progress(self.space_id, self.current_progress, {
+                "status": f"에러 발생: {str(e)}",
+                "result": {"spaceId": self.space_id}
+            })
             raise
 
     # 작업 완료 후 디렉토리 정리: common-sdk로 이전 예정
@@ -123,7 +184,7 @@ class NoteService:
                 language=self.language,
                 domain_type=self.domain_type,
                 output_dir=str(self.space_dir),
-                space_id=self.space_id
+                space_id=self.space_id,
             )
             parsed_data = parse_document(self.pdf, config)
             if not parsed_data:

@@ -43,7 +43,7 @@ class DocumentParseNode(BaseNode):
         self.output_dir = output_dir
         self.temp_dir = None
 
-    def upstage_layout_analysis(self, input_file, task_id):
+    def upstage_layout_analysis(self, input_file, space_id):
         """
         Upstage의 Document Parse API를 호출하여 문서 분석을 수행합니다.
 
@@ -52,7 +52,7 @@ class DocumentParseNode(BaseNode):
         """
         try:
             # settings.get_temp_dir() 사용
-            self.temp_dir = settings.get_temp_dir(task_id)
+            self.temp_dir = settings.get_temp_dir(space_id)
             os.makedirs(self.temp_dir, exist_ok=True)
             logger.info(f"임시 디렉토리 생성: {self.temp_dir}")
 
@@ -118,16 +118,16 @@ class DocumentParseNode(BaseNode):
             return (-1, -1)
 
     def execute(self, state: ParseState):
-        if "task_id" not in state:
-            raise ValueError("task_id is required in state")
+        if "space_id" not in state:
+            raise ValueError("space_id is required in state")
         
         start_time = time.time()
         logger.info(f"Start Parsing: {state['working_filepath']}")
 
         try:
             filepath = state["working_filepath"]
-            task_id = state["task_id"]
-            parsed_json = self.upstage_layout_analysis(filepath, task_id)
+            space_id = state["space_id"]
+            parsed_json = self.upstage_layout_analysis(filepath, space_id)
 
             # 파일명에서 시작 페이지 추출
             start_page, _ = self.parse_start_end_page(filepath)
@@ -152,7 +152,7 @@ class DocumentParseNode(BaseNode):
                 "metadata": [metadata],
                 "raw_elements": [data["elements"]],
                 "temp_dir": self.temp_dir,
-                "task_id": task_id
+                "space_id": space_id
             }
         except Exception as e:
             logger.error(f"파싱 중 오류 발생: {str(e)}")

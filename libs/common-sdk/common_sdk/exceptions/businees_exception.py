@@ -165,7 +165,7 @@ class ResultFileUploadPageExceeded(HTTPException):
 2. 리소스 미존재
 """
 # 요청 데이터(taskId) 누락
-class MissingTaskId(HTTPException):
+class MissingSpaceId(HTTPException):
     def __init__(self):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -177,7 +177,7 @@ class MissingTaskId(HTTPException):
         )
 
 # 리소스 미존재
-class TaskIdNotFound(HTTPException):
+class SpaceIdNotFound(HTTPException):
     def __init__(self):
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND,

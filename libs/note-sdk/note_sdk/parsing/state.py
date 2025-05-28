@@ -9,7 +9,7 @@ from note_sdk.parsing.element import Element
 파싱 상태 클래스 정의
 """
 class ParseState(TypedDict):
-    task_id: Annotated[str, "task_id"]  # 작업 ID
+    space_id: Annotated[str, "space_id"]  # 작업 ID
     filepath: Annotated[Optional[str], "filepath"]  # 원본 파일 경로 (선택적)
     filetype: Annotated[
         str, "filetype"

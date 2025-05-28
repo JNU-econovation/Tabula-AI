@@ -8,10 +8,10 @@ from common_sdk.auth import get_current_member
 from common_sdk.crud.s3 import S3Storage
 from common_sdk.crud.mongodb import MongoDB
 from note_sdk.config import settings
-from common_sdk.swagger import note_service_response, note_service_task_response
+from common_sdk.swagger import note_service_response, note_service_space_response
 from common_sdk.exceptions import (
-    UnsupportedNoteFileFormat, NoteFileSizeExceeded, TaskIdNotFound, 
-    MissingTaskId, MissingNoteFileData, MissingFieldData
+    UnsupportedNoteFileFormat, NoteFileSizeExceeded, SpaceIdNotFound, 
+    MissingSpaceId, MissingNoteFileData, MissingFieldData
 )
 
 from common_sdk.get_logger import get_logger
@@ -45,22 +45,22 @@ async def upload_file(
     
     # 파일 데이터 누락 검증
     if not file:
-        logger.error(f"userId: {userId} File data is missing")
+        logger.error(f"User: {userId} - File data is missing")
         raise MissingNoteFileData()
 
     # 필드 데이터 누락 검증
     if not langType or not fileDomain:
-        logger.error(f"userId: {userId} Field data is missing - langType: {langType}, fileDomain: {fileDomain}")
+        logger.error(f"User: {userId} - Field data is missing langType: {langType}, fileDomain: {fileDomain}")
         raise MissingFieldData()
 
     # 파일 형식 검증
     if file.content_type not in ALLOWED_FILE_TYPES:
-        logger.error(f"userId: {userId} Unsupported file type: {file.content_type}")
+        logger.error(f"User: {userId} - Unsupported file type: {file.content_type}")
         raise UnsupportedNoteFileFormat()
     
     # 파일 용량 검증
     if file.size > 5 * 1024 * 1024:  # 5MB
-        logger.error(f"userId: {userId} File size exceeds limit: {file.size}")
+        logger.error(f"User: {userId} - File size exceeds limit: {file.size}")
         raise NoteFileSizeExceeded()
 
     # space_id 생성
@@ -93,7 +93,8 @@ async def upload_file(
         domain_type=fileDomain,
         space_id=space_id,
         s3_url=s3_result,  # S3 URL 전달
-        file_name=file.filename   # 파일명 전달
+        file_name=file.filename,
+        user_id=userId
     )
     service_instances[space_id] = service
     
@@ -112,25 +113,25 @@ async def upload_file(
 
 
 # 학습 자료 진행률 조회 및 결과 확인 API
-@router.get("/{folderId}/progress/{taskId}", responses=note_service_task_response)
+@router.get("/{folderId}/progress/{spaceId}", responses=note_service_space_response)
 async def get_progress(
     folderId: str,
-    taskId: str = None,
+    spaceId: str = None,
     user_id: int = Depends(get_current_member)
 ):
     """
     SSE를 사용하여 진행률을 실시간으로 전송
     """
-    # taskId 누락 체크
-    if not taskId:
-        logger.error(f"userId: {user_id} TaskId is missing")
-        raise MissingTaskId()
+    # spaceId 누락 체크
+    if not spaceId:
+        logger.error(f"User: {user_id} - spaceId is missing")
+        raise MissingSpaceId()
 
     # 서비스 인스턴스 조회
-    service = service_instances.get(taskId)
+    service = service_instances.get(spaceId)
     if not service:
-        logger.error(f"userId: {user_id} Task not found: {taskId}")
-        raise TaskIdNotFound()
+        logger.error(f"User: {user_id} - Space not found: {spaceId}")
+        raise SpaceIdNotFound()
 
     # 진행률 스트림 반환
-    return get_progress_stream(taskId)
+    return get_progress_stream(spaceId)
