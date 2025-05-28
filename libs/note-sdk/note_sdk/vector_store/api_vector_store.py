@@ -129,10 +129,6 @@ class VectorLoader:
                     elif len(sparse_embedding['indices']) == 0 or len(sparse_embedding['values']) == 0:
                         logger.warning(f"[VectorLoader] Empty sparse embedding for chunk {chunkId}")
                         sparse_embedding = None
-                    else:
-                        logger.info(f"[VectorLoader] Valid sparse embedding for chunk {chunkId}")
-                else:
-                    logger.warning(f"[VectorLoader] BM25 encode_documents returned empty result for chunk {chunkId}")
                     
             except Exception as e:
                 logger.error(f"[VectorLoader] Sparse embedding error for chunk {chunkId}: {e}")
@@ -190,7 +186,6 @@ class VectorLoader:
         try:
             self.dense_index.upsert(vectors=[vector], namespace="documents")
             self.processed_vectors["text"]["dense"] += 1
-            logger.info(f"[VectorLoader] Successfully upserted dense vector: {vector['id']}")
             return True
         except Exception as e:
             logger.error(f"[VectorLoader] Dense vector upsertion error: {e}")
@@ -217,7 +212,6 @@ class VectorLoader:
                 namespace='documents'
             )
             self.processed_vectors["text"]["sparse"] += 1
-            logger.info(f"[VectorLoader] Successfully upserted sparse vector: {sparse_vector['id']}")
             return True
         except Exception as e:
             logger.error(f"[VectorLoader] Sparse vector upsertion error: {str(e)}")
@@ -235,8 +229,6 @@ class VectorLoader:
                 logger.warning("No chunks found in content")
                 return False
             
-            logger.info(f"Split content into {len(chunks)} chunks")
-            
             # 3. BM25 인코더 초기화
             self.bm25 = BM25Encoder()
             
@@ -245,8 +237,6 @@ class VectorLoader:
             if not non_empty_chunks:
                 logger.error(f"[VectorLoader] All chunks are empty after filtering")
                 return False
-                
-            logger.info(f"Fitting BM25 encoder with {len(non_empty_chunks)} non-empty chunks")
             
             try:
                 self.bm25.fit(non_empty_chunks)

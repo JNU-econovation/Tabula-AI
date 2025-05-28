@@ -67,6 +67,9 @@ class MongoDB:
             # ObjectId 생성
             object_id = ObjectId(space_id)
             
+            # 현재 시간을 한국 시간으로 변환
+            now = datetime.now(kst)
+            
             space_data = {
                 "_id": object_id,
                 "folder_id": folder_id,
@@ -76,8 +79,8 @@ class MongoDB:
                 "lang_type": lang_type,
                 "file_domain": file_domain,
                 "keyword": keywords,
-                "created_at": datetime.now(kst),
-                "updated_at": datetime.now(kst),
+                "created_at": now,
+                "updated_at": now,
                 "is_deleted": False
             }
             

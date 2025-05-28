@@ -68,7 +68,7 @@ class KeywordGuide:
                 
                 # 응답 토큰 수 계산
                 response_tokens = num_tokens_from_string(raw_content)
-                logger.info(f"[call_llm] Total tokens: {total_tokens + response_tokens} tokens")
+                logger.info(f"[call_llm] Keyword Guide - Total tokens: {total_tokens + response_tokens} tokens")
                 
                 if not raw_content or not raw_content.strip():
                     logger.error("[call_llm] LLM response content is empty")

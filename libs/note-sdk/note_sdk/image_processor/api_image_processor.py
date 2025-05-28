@@ -198,7 +198,7 @@ class ImageSummary:
                     await asyncio.sleep(3)
             
             # 전체 토큰 수 출력
-            logger.info(f"[process_markdown] Total tokens: {self.total_prompt_tokens + self.total_context_tokens + self.total_summary_tokens} tokens")
+            logger.info(f"[process_markdown] Image Summary - Total tokens: {self.total_prompt_tokens + self.total_context_tokens + self.total_summary_tokens} tokens")
             
             response = {
                 "document_id": document_id,

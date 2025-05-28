@@ -13,6 +13,7 @@ from common_sdk.crud.mongodb import MongoDB
 from note_sdk.config import settings
 from common_sdk.exceptions import FileNotFoundError
 from common_sdk.get_logger import get_logger
+from common_sdk.constants import ProgressPhase, ProgressRange, StatusMessage
 
 # 로거 설정
 logger = get_logger()
@@ -53,9 +54,9 @@ class NoteService:
             
             # 1. PDF 파싱 (0% - 30%)
             logger.info(f"[NoteService] User: {self.user_id} - Starting PDF Parsing")
-            self.current_progress = 0
+            self.current_progress = ProgressRange.PDF_PARSING[0]
             update_progress(self.space_id, self.current_progress, {
-                "status": "PDF 파싱 시작",
+                "status": StatusMessage.PDF_PARSING,
                 "result": {"spaceId": self.space_id}
             })
             
@@ -67,43 +68,43 @@ class NoteService:
             })
             
             await self.parse_pdf()
-            self.current_progress = 30
+            self.current_progress = ProgressRange.PDF_PARSING[1]
             update_progress(self.space_id, self.current_progress, {
-                "status": "PDF 파싱 완료",
+                "status": f"{ProgressPhase.PDF_PARSING} 완료",
                 "result": {"spaceId": self.space_id}
             })
             logger.info(f"[NoteService] User: {self.user_id} - PDF Parsing completed")
             
             # 2. 마크다운 처리 및 벡터DB 적재 (30% - 60%)
             logger.info(f"[NoteService] User: {self.user_id} - Starting Markdown Processing")
-            self.current_progress = 30
+            self.current_progress = ProgressRange.MARKDOWN_PROCESSING[0]
             update_progress(self.space_id, self.current_progress, {
-                "status": "마크다운 처리 시작",
+                "status": StatusMessage.MARKDOWN_PROCESSING,
                 "result": {"spaceId": self.space_id}
             })
             
             await self.process_markdown()
             
-            self.current_progress = 60
+            self.current_progress = ProgressRange.MARKDOWN_PROCESSING[1]
             update_progress(self.space_id, self.current_progress, {
-                "status": "마크다운 처리 완료",
+                "status": f"{ProgressPhase.MARKDOWN_PROCESSING} 완료",
                 "result": {"spaceId": self.space_id}
             })
             
             # 3. 키워드 생성 (60% - 90%)
             logger.info(f"[NoteService] User: {self.user_id} - Starting Keyword Generation")
-            self.current_progress = 60
+            self.current_progress = ProgressRange.KEYWORD_GENERATION[0]
             update_progress(self.space_id, self.current_progress, {
-                "status": "키워드 생성 시작",
+                "status": StatusMessage.KEYWORD_GENERATION,
                 "result": {"spaceId": self.space_id}
             })
             
             keyword_result = await self.generate_keywords()
             self.keyword_result = keyword_result
             
-            self.current_progress = 90
+            self.current_progress = ProgressRange.KEYWORD_GENERATION[1]
             update_progress(self.space_id, self.current_progress, {
-                "status": "키워드 생성 완료",
+                "status": f"{ProgressPhase.KEYWORD_GENERATION} 완료",
                 "result": {"spaceId": self.space_id}
             })
 
@@ -113,9 +114,9 @@ class NoteService:
 
             # 4. MongoDB에 공간 저장 (90% - 100%)
             logger.info(f"[NoteService] User: {self.user_id} - Saving to MongoDB")
-            self.current_progress = 90
+            self.current_progress = ProgressRange.DB_STORAGE[0]
             update_progress(self.space_id, self.current_progress, {
-                "status": "MongoDB 저장 중",
+                "status": StatusMessage.DB_STORAGE,
                 "result": {"spaceId": self.space_id}
             })
             
@@ -136,7 +137,7 @@ class NoteService:
             logger.info(f"[NoteService] User: {self.user_id} - Processing Completed")
             self.current_progress = 100
             update_progress(self.space_id, self.current_progress, {
-                "status": "처리 완료",
+                "status": StatusMessage.COMPLETE,
                 "result": {
                     "spaceId": self.space_id,
                     "spaceName": space_name
@@ -146,22 +147,31 @@ class NoteService:
             # 6. 백그라운드 작업 시작 (SSE 종료 후)
             logger.info(f"[NoteService] User: {self.user_id} - Starting Background Tasks")
             
-            # 6.1 이미지 처리
-            logger.info(f"[NoteService] User: {self.user_id} - Starting Image Processing")
-            await self.process_images_background()
-            logger.info(f"[NoteService] User: {self.user_id} - Image Processing Completed")
-            
-            # 6.2 작업 디렉토리 정리
-            self.cleanup_task_directory(self.space_dir)
-            logger.info(f"[NoteService] User: {self.user_id} - Finished Background Tasks")
+            try:
+                # 6.1 이미지 처리
+                logger.info(f"[NoteService] User: {self.user_id} - Starting Image Processing")
+                await self.process_images_background()
+                logger.info(f"[NoteService] User: {self.user_id} - Image Processing Completed")
+                
+                # 6.2 작업 디렉토리 정리 (모든 작업이 완료된 후)
+                self.cleanup_task_directory(self.space_dir)
+                logger.info(f"[NoteService] User: {self.user_id} - Finished Background Tasks")
+                
+            except Exception as e:
+                logger.error(f"[NoteService] User: {self.user_id} - Error in background tasks: {str(e)}")
+                # 백그라운드 작업 실패 시에도 디렉토리 정리 시도
+                self.cleanup_task_directory(self.space_dir)
+                raise
             
         except Exception as e:
             logger.error(f"[NoteService] User: {self.user_id} - Error occurred during document processing: {str(e)}")
             self.current_progress = -1
             update_progress(self.space_id, self.current_progress, {
-                "status": f"에러 발생: {str(e)}",
+                "status": f"{StatusMessage.ERROR}: {str(e)}",
                 "result": {"spaceId": self.space_id}
             })
+            # 에러 발생 시에도 디렉토리 정리 시도
+            self.cleanup_task_directory(self.space_dir)
             raise
 
     # 작업 완료 후 디렉토리 정리: common-sdk로 이전 예정
@@ -249,20 +259,17 @@ class NoteService:
 
     # 이미지 처리 로직
     async def process_images_background(self):
-
-        md_path = self.md_dir / f"{self.document_id}.md"
-        with open(md_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-        
-        image_result = await self.image_summary.process_markdown(content, self.document_id)
-        
-        if image_result and "objects" in image_result:
-            # 이미지 처리 전 딜레이 (2초)
-            await asyncio.sleep(2)
-
-            await self.vector_loader.process_images(image_result["objects"], self.document_id)
-
-            # 이미지 처리 후 딜레이 (2초)
-            await asyncio.sleep(2)
+        try:
+            md_path = self.md_dir / f"{self.document_id}.md"
+            with open(md_path, 'r', encoding='utf-8') as f:
+                content = f.read()
             
-        return True
+            image_result = await self.image_summary.process_markdown(content, self.document_id)
+            
+            # 이미지 처리 완료
+            logger.info(f"[NoteService] User: {self.user_id} - Image Processing Completed")
+            return image_result
+            
+        except Exception as e:
+            logger.error(f"[NoteService] User: {self.user_id} - Background Image Processing Error: {str(e)}")
+            return False
