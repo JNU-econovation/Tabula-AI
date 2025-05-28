@@ -1,12 +1,13 @@
 import re
 import asyncio
-
-from pinecone import Pinecone
+import json
+from pinecone import Pinecone, ServerlessSpec
 from typing import List, Dict, Any, Literal
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from concurrent.futures import ThreadPoolExecutor
 from pinecone_text.sparse import BM25Encoder
 
+from common_sdk.exceptions import ExternalConnectionError
 from common_sdk.utils import get_embedding
 from note_sdk.config import settings
 from common_sdk.get_logger import get_logger
@@ -20,14 +21,15 @@ class VectorLoader:
         """
         Args:
             language: 언어 설정 (ko / en)
-            space_id: 작업 ID
-        
-        VectorLoader 초기화
+            space_id: 작업 ID (None이면 ObjectId로 자동 생성)
         """
         self.language = language
+        # space_id가 없으면 ObjectId로 자동 생성
         self.space_id = space_id
         
-        # Pinecone 클라이언트 초기화(language에 따른 API KEY 설정)
+        logger.info(f"VectorLoader initialized with language: {language}, space_id: {self.space_id}")
+        
+        # Pinecone 클라이언트 초기화
         self.pc = Pinecone(api_key=settings.PINECONE_API_KEY)
         
         # 인덱스 초기화
@@ -50,20 +52,26 @@ class VectorLoader:
             "image": {"dense": 0, "sparse": 0}
         }
 
-    # Dense Vector Pinecone 인덱스 초기화
     def init_dense_index(self) -> Any:
         try:
             # 언어에 따른 인덱스 설정
             index_name = settings.INDEX_NAME_KOR_DEN_CONTENTS if self.language == "ko" else settings.INDEX_NAME_ENG_DEN_CONTENTS
             
+            # 언어별 차원 설정
+            dimension = 4096 if self.language == "ko" else 3072  # Upstage: 4096, OpenAI 3-large: 3072
+            
             # 인덱스 존재 확인
             if index_name not in self.pc.list_indexes().names():
-                logger.info(f"'{index_name}' index not found")
+                logger.info(f"'{index_name}' index not found, creating with dimension {dimension}")
                 # 인덱스가 없으면 생성
                 self.pc.create_index(
                     name=index_name,
-                    dimension=1536,  # dense vector 차원
-                    metric="cosine"  # dense vector는 cosine similarity 사용
+                    dimension=dimension,
+                    metric="cosine",
+                    spec=ServerlessSpec(
+                        cloud='aws',
+                        region='us-east-1'
+                    )
                 )
                 logger.info(f"Created new dense index: {index_name}")
             
@@ -71,9 +79,8 @@ class VectorLoader:
         
         except Exception as e:
             logger.error(f"Dense index initialization error: {e}")
-            return None
+            raise ExternalConnectionError()
 
-    # Sparse Vector Pinecone 인덱스 초기화
     def init_sparse_index(self) -> Any:
         try:
             # 언어에 따른 인덱스 설정
@@ -81,12 +88,16 @@ class VectorLoader:
             
             # 인덱스 존재 확인
             if index_name not in self.pc.list_indexes().names():
-                logger.info(f"'{index_name}' index not found")
-                # 인덱스가 없으면 생성
+                logger.info(f"'{index_name}' sparse index not found")
+                # 인덱스가 없으면 생성 (sparse는 동적 차원)
                 self.pc.create_index(
                     name=index_name,
-                    dimension=1536,  # sparse vector 차원
-                    metric="dotproduct"
+                    dimension=1,  # sparse vector는 동적 차원이므로 최소값
+                    metric="dotproduct",
+                    spec=ServerlessSpec(
+                        cloud='aws',
+                        region='us-east-1'
+                    )
                 )
                 logger.info(f"Created new sparse index: {index_name}")
             
@@ -94,66 +105,107 @@ class VectorLoader:
         
         except Exception as e:
             logger.error(f"Sparse index initialization error: {e}")
-            return None
-        
-    # 마크다운에서 이미지 경로 추출
+            raise ExternalConnectionError()
+
     def extract_image_paths(self, content: str) -> List[Dict[str, str]]:
         pattern = r'!\[(.*?)\]\((.*?)\)'
         matches = re.finditer(pattern, content)
-        # alt_text 제거하고 image_path만 반환
-        return [{"image_path": m.group(2)} for m in matches]
+        imagePaths = [{"imagePath": m.group(2)} for m in matches]
+        
+        if not imagePaths:
+            logger.info("No image paths found in content")
+        else:
+            logger.info(f"Found {len(imagePaths)} image paths")
+        
+        return imagePaths
 
-    # 청크에 포함된 이미지 경로 찾기
-    def find_images_in_chunk(self, chunk: str, image_paths: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    def find_images_in_chunk(self, chunk: str, imagePaths: List[Dict[str, str]]) -> List[Dict[str, str]]:
+        if not imagePaths:
+            return []
+        return [img for img in imagePaths if img["imagePath"] in chunk]
 
-        return [img for img in image_paths if img["image_path"] in chunk]
-    
-
-    # 청크 처리 및 벡터 DB 적재
-    async def process_chunk(self, chunk: str, chunk_id: int, document_id: str, image_paths: List[Dict[str, str]]) -> bool:
+    async def process_chunk(self, chunk: str, chunkId: int, imagePaths: List[Dict[str, str]]) -> bool:
         try:
             # 1. 청크에 포함된 이미지 경로 찾기
-            chunk_image_paths = self.find_images_in_chunk(chunk, image_paths)
+            chunk_imagePaths = self.find_images_in_chunk(chunk, imagePaths)
             
-            # 2. 임베딩 생성 (Dense/Sparse)
+            # 2. Dense 임베딩 생성
             dense_embedding = await asyncio.get_event_loop().run_in_executor(
                 self.executor,
                 get_embedding,
                 chunk,
                 self.language
             )
-            sparse_embedding = self.bm25.encode_documents([chunk])[0]  # {'indices': [...], 'values': [...]} 형식
             
-            # 3. 메타데이터 구성
+            # Dense 임베딩 검증
+            if not dense_embedding or len(dense_embedding) == 0:
+                logger.error(f"Dense embedding generation failed for chunk {chunkId}")
+                return False
+            
+            # 3. Sparse 임베딩 생성 및 검증
+            sparse_embedding = None
+            try:
+                sparse_result = self.bm25.encode_documents([chunk])
+                if sparse_result and len(sparse_result) > 0:
+                    sparse_embedding = sparse_result[0]
+                    
+                    if not sparse_embedding or 'indices' not in sparse_embedding or 'values' not in sparse_embedding:
+                        logger.warning(f"Invalid sparse embedding structure for chunk {chunkId}")
+                        sparse_embedding = None
+                    elif len(sparse_embedding['indices']) == 0 or len(sparse_embedding['values']) == 0:
+                        logger.warning(f"Empty sparse embedding for chunk {chunkId}")
+                        sparse_embedding = None
+                    else:
+                        logger.info(f"Valid sparse embedding for chunk {chunkId}")
+                else:
+                    logger.warning(f"BM25 encode_documents returned empty result for chunk {chunkId}")
+                    
+            except Exception as e:
+                logger.error(f"Sparse embedding error for chunk {chunkId}: {e}")
+                sparse_embedding = None
+            
+            # 4. 메타데이터 구성
+            image_references_json = json.dumps([{"imagePath": str(img["imagePath"])} for img in chunk_imagePaths]) if chunk_imagePaths else "[]"
+            
             metadata = {
-                "document_id": document_id,
-                "chunk_id": chunk_id,
+                "spaceId": str(self.space_id),
+                "chunkId": int(chunkId),
                 "type": "text",
-                "content": chunk,
-                "image_references": [img["image_path"] for img in chunk_image_paths]
+                "content": str(chunk),
+                "imageReferences": image_references_json
             }
             
-            # 4. 벡터 데이터 구성
+            # 5. Dense 벡터 데이터 구성 및 업로드
+            vector_id = f"{str(self.space_id)}_{self.language}_{chunkId}_text"
             dense_vector = {
-                "id": f"{document_id}_{self.language}_{chunk_id}_text_dense",
+                "id": f"{vector_id}_dense",
                 "values": dense_embedding,
                 "metadata": metadata
             }
-            sparse_vector = {
-                "id": f"{document_id}_{self.language}_{chunk_id}_text_sparse",
-                "sparse_values": {
-                    "indices": sparse_embedding['indices'],
-                    "values": sparse_embedding['values']
-                },
-                "metadata": metadata
-            }
             
-            # 5. Dense/Sparse 벡터 병렬 적재
-            dense_task = asyncio.create_task(self.upsert_dense_vector(dense_vector, document_id))
-            sparse_task = asyncio.create_task(self.upsert_sparse_vector(document_id, sparse_vector, metadata))
+            logger.info(f"Processing chunk {chunkId} with spaceId: {self.space_id}")
+            dense_task = asyncio.create_task(self.upsert_dense_vector(dense_vector))
             
-            await dense_task
-            await sparse_task
+            # 6. Sparse 벡터 처리 (성공한 경우에만)
+            sparse_task = None
+            if sparse_embedding:
+                sparse_vector = {
+                    "id": f"{vector_id}_sparse",
+                    "sparse_values": {
+                        "indices": sparse_embedding['indices'],
+                        "values": sparse_embedding['values']
+                    },
+                    "metadata": metadata
+                }
+                sparse_task = asyncio.create_task(self.upsert_sparse_vector(sparse_vector))
+            else:
+                logger.info(f"Skipping sparse vector for chunk {chunkId} due to empty embedding")
+            
+            # 7. 병렬 실행
+            if sparse_task:
+                await asyncio.gather(dense_task, sparse_task)
+            else:
+                await dense_task
             
             return True
             
@@ -161,168 +213,99 @@ class VectorLoader:
             logger.error(f"Chunk processing error: {e}")
             return False
 
-    async def upsert_dense_vector(self, vector: Dict[str, Any], namespace: str) -> bool:
-        """Dense 벡터 적재"""
+    async def upsert_dense_vector(self, vector: Dict[str, Any]) -> bool:
         try:
-            # namespace를 'documents'로 통일하고 document_id는 메타데이터로 유지
             self.dense_index.upsert(vectors=[vector], namespace="documents")
             self.processed_vectors["text"]["dense"] += 1
+            logger.info(f"Successfully upserted dense vector: {vector['id']}")
             return True
         except Exception as e:
             logger.error(f"Dense vector upsertion error: {e}")
             return False
 
-    def convert_sparse_vector_format(self, sparse_vector: Dict) -> List:
-        """sparse vector 형식을 Pinecone이 기대하는 형식으로 변환"""
+    async def upsert_sparse_vector(self, sparse_vector: Dict) -> bool:
         try:
-            if not isinstance(sparse_vector, dict):
-                logger.error(f"Invalid sparse vector type: {type(sparse_vector)}")
-                return []
+            # Sparse 벡터 데이터 검증
+            sparse_values = sparse_vector.get('sparse_values', {})
+            indices = sparse_values.get('indices', [])
+            values = sparse_values.get('values', [])
             
-            indices = sparse_vector.get('indices', [])
-            values = sparse_vector.get('values', [])
+            if not indices or not values or len(indices) != len(values):
+                logger.warning(f"Invalid sparse vector data: indices={len(indices)}, values={len(values)}")
+                return False
             
-            # 디버깅을 위한 로그 추가
-            logger.info(f"Sparse vector indices: {indices[:5]}...")
-            logger.info(f"Sparse vector values: {values[:5]}...")
-            
-            # indices와 values를 리스트로 변환
-            if isinstance(indices, list) and isinstance(values, list):
-                if len(indices) != len(values):
-                    logger.error(f"Length mismatch: indices={len(indices)}, values={len(values)}")
-                    return []
-                return list(zip(indices, values))
-            
-            logger.error(f"Invalid indices or values type: indices={type(indices)}, values={type(values)}")
-            return []
-            
-        except Exception as e:
-            logger.error(f"Error in sparse vector format conversion: {str(e)}")
-            return []
-
-    async def upsert_sparse_vector(self, document_id: str, sparse_vector: Dict, metadata: Dict = None) -> bool:
-        """sparse vector를 Pinecone에 업서트"""
-        try:
-            # Pinecone에 업서트 (sparse_values 사용)
+            # Pinecone에 업서트
             self.sparse_index.upsert(
                 vectors=[{
                     'id': sparse_vector['id'],
                     'sparse_values': sparse_vector['sparse_values'],
-                    'metadata': metadata or {}
+                    'metadata': sparse_vector['metadata']
                 }],
                 namespace='documents'
             )
             self.processed_vectors["text"]["sparse"] += 1
+            logger.info(f"Successfully upserted sparse vector: {sparse_vector['id']}")
             return True
         except Exception as e:
             logger.error(f"Sparse vector upsertion error: {str(e)}")
             return False
 
-    # 마크다운 처리 및 벡터 DB 적재
     async def process_markdown(self, content: str, document_id: str) -> bool:
         try:
             # 1. 이미지 경로 추출
-            image_paths = self.extract_image_paths(content)
+            imagePaths = self.extract_image_paths(content)
             
             # 2. 텍스트 분할
             chunks = self.text_splitter.split_text(content)
             
+            if not chunks:
+                logger.warning("No chunks found in content")
+                return False
+            
+            logger.info(f"Split content into {len(chunks)} chunks")
+            
             # 3. BM25 인코더 초기화
             self.bm25 = BM25Encoder()
-            self.bm25.fit(chunks)
+            
+            # 빈 청크 필터링
+            non_empty_chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
+            if not non_empty_chunks:
+                logger.warning("All chunks are empty after filtering")
+                return False
+                
+            logger.info(f"Fitting BM25 encoder with {len(non_empty_chunks)} non-empty chunks")
+            
+            try:
+                self.bm25.fit(non_empty_chunks)
+                logger.info("BM25 encoder fitted successfully")
+            except Exception as e:
+                logger.error(f"BM25 encoder fitting failed: {e}")
+                return False
             
             # 4. 청크별 파이프라인 처리
             tasks = []
             for i, chunk in enumerate(chunks):
-                task = asyncio.create_task(
-                    self.process_chunk(chunk, i + 1, document_id, image_paths)
-                )
-                tasks.append(task)
+                if chunk.strip():  # 빈 청크 스킵
+                    task = asyncio.create_task(
+                        self.process_chunk(chunk, i + 1, imagePaths)
+                    )
+                    tasks.append(task)
+                else:
+                    logger.warning(f"Skipping empty chunk {i + 1}")
+            
+            if not tasks:
+                logger.warning("No valid chunks to process")
+                return False
             
             # 5. 모든 청크 처리 완료 대기
             results = await asyncio.gather(*tasks)
+            success_count = sum(results)
+            
+            logger.info(f"Processed {success_count}/{len(tasks)} chunks successfully")
+            logger.info(f"Total images found: {len(imagePaths)}")
+            
             return all(results)
             
         except Exception as e:
             logger.error(f"Markdown processing error: {e}")
             return False
-
-    # 이미지 처리도 비슷한 방식으로 수정
-    async def process_image(self, image_info: Dict[str, Any], document_id: str) -> bool:
-        try:
-            # 1. 임베딩 생성
-            dense_embedding = await asyncio.get_event_loop().run_in_executor(
-                self.executor,
-                get_embedding,
-                image_info["summary"],
-                self.language
-            )
-            sparse_embedding = self.bm25.encode_documents([image_info["summary"]])[0]
-            
-            # 2. 메타데이터 구성
-            metadata = {
-                "document_id": document_id,
-                "chunk_id": image_info["chunk_id"],
-                "type": "image",
-                "content": image_info["summary"],
-                "image_path": image_info["path"]
-            }
-            
-            # 3. 벡터 데이터 구성
-            dense_vector = {
-                "id": f"{document_id}_{self.language}_{image_info['chunk_id']}_image_dense",
-                "values": dense_embedding,
-                "metadata": metadata
-            }
-            sparse_vector = {
-                "id": f"{document_id}_{self.language}_{image_info['chunk_id']}_image_sparse",
-                "sparse_values": {
-                    "indices": sparse_embedding['indices'],
-                    "values": sparse_embedding['values']
-                },
-                "metadata": metadata
-            }
-            
-            # 4. Dense/Sparse 벡터 병렬 적재
-            dense_task = asyncio.create_task(self.upsert_dense_vector(dense_vector, document_id))
-            sparse_task = asyncio.create_task(self.upsert_sparse_vector(document_id, sparse_vector, metadata))
-            
-            await dense_task
-            await sparse_task
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"Image processing error: {e}")
-            return False
-
-    async def process_images(self, image_infos: List[Dict[str, Any]], document_id: str) -> bool:
-        try:
-            # 1. BM25 인코더 초기화
-            self.bm25 = BM25Encoder()
-            self.bm25.fit([info["summary"] for info in image_infos])
-            
-            # 2. 이미지별 파이프라인 처리
-            tasks = []
-            for i, image_info in enumerate(image_infos):
-                image_info["chunk_id"] = i + 1
-                task = asyncio.create_task(
-                    self.process_image(image_info, document_id)
-                )
-                tasks.append(task)
-            
-            # 3. 모든 이미지 처리 완료 대기
-            results = await asyncio.gather(*tasks)
-            return all(results)
-            
-        except Exception as e:
-            logger.error(f"Images processing error: {e}")
-            return False
-
-    # 처리된 벡터 통계 반환
-    def get_processing_stats(self) -> Dict[str, Any]:
-    
-        return {
-            "text": self.processed_vectors["text"],
-            "image": self.processed_vectors["image"]
-        }

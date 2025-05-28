@@ -16,7 +16,7 @@ class ParseConfig:
     language: str # 언어 설정
     domain_type: str # 도메인 타입
     output_dir: str # 결과 디렉토리 경로
-    task_id: str # 작업 ID
+    space_id: str # 작업 ID
  
 
 # PDF 문서 파싱을 위한 메인 함수
@@ -49,7 +49,7 @@ def parse_document(file: str, config: ParseConfig) -> Dict[str, Any]:
         "language": config.language,
         "domain_type": config.domain_type,
         "output_dir": config.output_dir,
-        "task_id": config.task_id,
+        "space_id": config.space_id,
         "filetype": "pdf",
         "include_image_in_output": True
     }

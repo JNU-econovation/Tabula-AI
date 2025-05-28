@@ -24,14 +24,14 @@ class SplitPDFFilesNode(BaseNode):
 
     # 입력 PDF를 여러 개의 작은 PDF 파일로 분할
     def execute(self, state: ParseState) -> ParseState:
-        task_id = state["task_id"]
+        space_id = state["space_id"]
         
         # 임시 디렉토리 생성
-        temp_dir = settings.get_temp_dir(task_id)
+        temp_dir = settings.get_temp_dir(space_id)
         os.makedirs(temp_dir, exist_ok=True)
 
         # PDF 파일 경로 가져오기
-        origin_dir = settings.get_origin_dir(task_id)
+        origin_dir = settings.get_origin_dir(space_id)
         pdf_files = list(origin_dir.glob("*.pdf"))
         
         if not pdf_files:
@@ -59,7 +59,7 @@ class SplitPDFFilesNode(BaseNode):
             end_page = min(start_page + self.batch_size, num_pages) - 1
 
             # 분할된 PDF 파일명 생성 (임시 디렉토리에 저장)
-            output_file = os.path.join(temp_dir, f"{task_id}_{start_page:04d}_{end_page:04d}.pdf")
+            output_file = os.path.join(temp_dir, f"{space_id}_{start_page:04d}_{end_page:04d}.pdf")
             logger.info(f"PDF split: {output_file}")
 
             # 새로운 PDF 파일 생성 및 페이지 삽입
@@ -87,14 +87,14 @@ class SplitPDFFilesNode(BaseNode):
             "filepath": str(pdf_path),  # 원본 PDF 파일 경로 추가
             "filetype": "pdf",
             "temp_dir": temp_dir,
-            "task_id": task_id
+            "space_id": space_id
         }
 
     def split_pdf(self, pdf_path, output_dir, max_pages):
         """PDF 파일을 페이지별로 분할하는 함수"""
         # settings.get_temp_dir() 사용
-        task_id = os.path.splitext(os.path.basename(pdf_path))[0]
-        temp_dir = settings.get_temp_dir(task_id)
+        space_id = os.path.splitext(os.path.basename(pdf_path))[0]
+        temp_dir = settings.get_temp_dir(space_id)
         os.makedirs(temp_dir, exist_ok=True)
         
         pdf = PdfReader(pdf_path)
@@ -103,7 +103,7 @@ class SplitPDFFilesNode(BaseNode):
         
         for i in range(0, total_pages, max_pages):
             end_page = min(i + max_pages, total_pages)
-            output_path = os.path.join(temp_dir, f"{task_id}_{i+1:04d}_{end_page:04d}.pdf")
+            output_path = os.path.join(temp_dir, f"{space_id}_{i+1:04d}_{end_page:04d}.pdf")
             
             writer = PdfWriter()
             for page in range(i, end_page):

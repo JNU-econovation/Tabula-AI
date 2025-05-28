@@ -25,10 +25,10 @@ class CreateElementsNode(BaseNode):
         self.add_newline = add_newline
         self.newline = "\n" if add_newline else ""
 
-    def save_base64_image(self, base64_str, task_id, page_num, element_id):
+    def save_base64_image(self, base64_str, space_id, page_num, element_id):
         """base64 인코딩된 이미지를 파일로 저장하는 함수"""
         # settings.get_image_dir() 사용
-        image_dir = settings.get_image_dir(task_id)
+        image_dir = settings.get_image_dir(space_id)
         os.makedirs(image_dir, exist_ok=True)
         
         # 이미지 파일명 생성
@@ -43,8 +43,7 @@ class CreateElementsNode(BaseNode):
 
     def execute(self, state: ParseState) -> ParseState:
         post_processed_elements = []
-        task_id = state["task_id"]
-        document_id = task_id
+        space_id = state["space_id"]
 
         for element in state["elements_from_parser"]:
             elem = None
@@ -68,7 +67,7 @@ class CreateElementsNode(BaseNode):
                 # figure, chart
                 image_filename = self.save_base64_image(
                     element["base64_encoding"],
-                    task_id,
+                    space_id,
                     element["page"],
                     element["id"],
                 )
