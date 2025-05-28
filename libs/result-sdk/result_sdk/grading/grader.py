@@ -1,3 +1,5 @@
+# grader.py
+
 from typing import List, Tuple
 from .models import GradingConfig, EvaluationResponse
 from .workflow import CorrectionWorkflow, extract_wrong_answer_ids
@@ -7,12 +9,13 @@ class GradingService:
     """자동 채점 Main 클래스"""
 
     def __init__(self, 
-        document_id: str, 
+        space_id: str, 
         index_name: str,
         openai_api_keys: List[str] = None,
         model_name: str = "gpt-4.1-mini",
         temperature: float = 0,
-        max_tokens: int = 1000
+        max_tokens: int = 1000,
+        lang_type: str = "ko"
     ):
         """채점 서비스 초기화"""
 
@@ -23,13 +26,14 @@ class GradingService:
                 ]
 
         self.config = GradingConfig(
-            document_id=document_id,
+            space_id=space_id,
             index_name=index_name,
             prompt_template="",
             openai_api_keys=openai_api_keys,
             model_name=model_name,
             temperature=temperature,
-            max_tokens=max_tokens
+            max_tokens=max_tokens,
+            lang_type=lang_type
         )
 
         self.workflow = CorrectionWorkflow(self.config)
@@ -39,9 +43,10 @@ class GradingService:
         채점 실행 (LangGraph 워크플로우)
         """
         return await self.workflow.run_correction(
-            document_id=self.config.document_id,
+            space_id=self.config.space_id,
             index_name=self.config.index_name,
-            user_inputs=user_inputs
+            user_inputs=user_inputs,
+            lang_type=self.config.lang_type
         )
     
     async def grade_with_wrong_ids(self, user_inputs: str) -> Tuple[EvaluationResponse, List[List[int]]]:

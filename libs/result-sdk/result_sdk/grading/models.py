@@ -1,3 +1,5 @@
+# models.py
+
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional, TypedDict
 
@@ -37,26 +39,27 @@ class GradingResult(BaseModel):
 
 class GradingConfig(BaseModel):
     """채점 설정 모델"""
-    document_id: str
+    space_id: str
     index_name: str
     prompt_template: str
     openai_api_keys: List[str]
     model_name: str = "gpt-4.1-mini"
     temperature: float = 0
     max_tokens: int = 700
+    lang_type: str = "ko"  # 언어 타입 추가
 
 
 class GraphState(TypedDict):
     """그래프 상태 타입"""
-    document_id: str
+    space_id: str
     index_name: str
+    lang_type: str  # 언어 타입 추가
     user_inputs: List[Any]
     prompt_template: str
     all_texts: List[str]
     pages: Dict[int, List[Any]]
-    bm25_encoder: Any
+    document_finder: Any
     wrong_answers_by_page: Dict[int, List[Dict[str, Any]]]
-    embedder: Any
     page_results: List[tuple]
     final_results: List[PageResult]
     page_processes_pending: bool
