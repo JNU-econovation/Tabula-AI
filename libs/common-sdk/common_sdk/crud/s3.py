@@ -36,11 +36,11 @@ class S3Storage:
         try:
             # 버킷 존재 여부 확인
             self.client.head_bucket(Bucket=self.bucket)
-            logger.info(f"S3 connection successful - Bucket: {self.bucket}")
+            logger.info(f"[check_connection] S3 connection successful - Bucket: {self.bucket}")
             return True
         
         except Exception as e:
-            logger.error(f"S3 connection failed: {str(e)}")
+            logger.error(f"[check_connection] S3 connection failed: {str(e)}")
             raise ExternalConnectionError()
     
     # 파일 업로드(S3)
@@ -50,13 +50,6 @@ class S3Storage:
             file_path (str): 업로드할 파일 경로(pdf)
             user_id (int): 사용자 ID
             space_id (str): 학습 공간 ID
-            
-        Returns:
-            Dict[str, Any]: {
-                "s3_key": str,  # S3에 저장된 파일의 키
-                "bucket": str,  # S3 버킷 이름
-                "url": str      # S3 파일 URL
-            }
         """
         try:
             # S3 경로 생성
@@ -73,10 +66,10 @@ class S3Storage:
             # S3 URL 생성
             s3_url = f"https://{self.bucket}.s3.{settings.AWS_REGION}.amazonaws.com/{s3_key}"
             
-            logger.info(f"User: {user_id} File uploaded successfully to S3 - {s3_key}")
+            logger.info(f"[upload_note_file] User: {user_id} - Upload successfully: {s3_key}")
             
             return s3_url
             
         except Exception as e:
-            logger.error(f"User: {user_id} File upload failed to S3 - {str(e)}")
+            logger.error(f"[upload_note_file] User: {user_id} - Failed to upload: {str(e)}")
             raise UploadFailedError()

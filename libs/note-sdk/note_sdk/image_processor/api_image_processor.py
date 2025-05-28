@@ -16,6 +16,7 @@ from common_sdk.utils import get_embedding
 from common_sdk.utils import num_tokens_from_string
 from common_sdk.get_logger import get_logger
 from common_sdk.prompt_loader import PromptLoader
+from common_sdk.exceptions import ImageProcessingError
 
 # 로거 설정
 logger = get_logger()
@@ -58,8 +59,8 @@ class ImageSummary:
         # 이미지 처리 결과 저장을 위한 변수 추가
         self.processed_images = []
 
+    # 이미지 크기 조정
     def resize_image(self, image_path: str, max_size: int = 1024) -> bytes:
-        """이미지 크기 조정"""
         try:
             with Image.open(image_path) as img:
                 # 이미지 비율 유지하면서 리사이징
@@ -72,11 +73,12 @@ class ImageSummary:
                 img.save(img_byte_arr, format='JPEG', quality=85)
                 return img_byte_arr.getvalue()
         except Exception as e:
-            logger.error(f"Image resizing failed: {str(e)}")
-            raise
+            logger.error(f"[resize_image] Image resizing failed: {str(e)}")
+            raise ImageProcessingError()
 
-    def _extract_image_paths(self, content: str) -> List[Dict[str, str]]:
-        """마크다운에서 이미지 경로와 컨텍스트 추출"""
+    # 마크다운에서 이미지 경로와 컨텍스트 추출
+    def extract_image_paths(self, content: str) -> List[Dict[str, str]]:
+        
         # 이미지 태그의 전체 문자열, alt 텍스트, 경로, 시작 및 끝 위치를 캡처하는 수정된 패턴
         pattern = r'(!\[(.*?)\]\((.*?)\))' 
         matches = re.finditer(pattern, content)
@@ -106,7 +108,7 @@ class ImageSummary:
 
     @retry(stop=stop_after_attempt(3), wait=wait_exponential(multiplier=1, min=4, max=10))
     async def process_image(self, image_info: Dict[str, str]) -> Dict:
-        """이미지 처리"""
+
         actual_image_path = ""
         try:
             # 실제 이미지 경로 조합
@@ -118,7 +120,7 @@ class ImageSummary:
             actual_image_path = os.path.join(self.image_base_path, relative_path)
             
             # 이미지 리사이징
-            resized_image = self.resize_image(actual_image_path)
+            self.resize_image(actual_image_path)
             
             # 컨텍스트 토큰 수 계산 및 누적
             context_tokens = num_tokens_from_string(image_info['context'])
@@ -155,29 +157,29 @@ class ImageSummary:
             
         except Exception as e:
             error_path = actual_image_path if actual_image_path else image_info["path"]
-            logger.error(f"Image processing failed (path: {error_path}): {str(e)}")
-            raise
+            logger.error(f"[process_image] Image processing failed (path: {error_path}): {str(e)}")
+            raise ImageProcessingError()
 
-
+    # 마크다운 문서 처리
     async def process_markdown(self, content: str, document_id: str) -> Dict:
-        """마크다운 문서 처리"""
+        
         try:
             # 이미지 처리 결과 저장
             self.processed_images = []
-            image_infos = self._extract_image_paths(content)
+            image_infos = self.extract_image_paths(content)
             
-            logger.info(f"\n=== Start Image Processing ===")
-            logger.info(f"Found {len(image_infos)} images")
+            logger.info(f"\n[process_markdown] Start Image Processing")
+            logger.info(f"[process_markdown] Found {len(image_infos)} images")
             
             # 배치 크기 설정 (한 번에 처리할 이미지 수)
             batch_size = 3
             for i in range(0, len(image_infos), batch_size):
                 batch = image_infos[i:i + batch_size]
-                logger.info(f"\nBatch {i//batch_size + 1} processing... ({i+1}-{min(i+batch_size, len(image_infos))}/{len(image_infos)})")
+                # logger.info(f"\nBatch {i//batch_size + 1} processing... ({i+1}-{min(i+batch_size, len(image_infos))}/{len(image_infos)})")
                 
                 # 배치 내 이미지 순차 처리
                 for j, image_info in enumerate(batch):
-                    logger.info(f"Processing image {i+j+1}/{len(image_infos)}...")
+                    # logger.info(f"Processing image {i+j+1}/{len(image_infos)}...")
                     
                     try:
                         result = await self.process_image(image_info)
@@ -188,32 +190,24 @@ class ImageSummary:
                             await asyncio.sleep(1)
                             
                     except Exception as e:
-                        logger.error(f"Image processing failed: {str(e)}")
+                        logger.error(f"[process_markdown] Image processing failed: {str(e)}")
                         continue
                 
                 # 배치 간 딜레이 (3초)
                 if i + batch_size < len(image_infos):
-                    logger.info("Waiting for next batch...")
                     await asyncio.sleep(3)
             
             # 전체 토큰 수 출력
-            logger.info("\n=== 전체 토큰 사용량 ===")
-            logger.info(f"시스템 프롬프트: {self.system_tokens} 토큰")
-            logger.info(f"사용자 프롬프트: {self.user_tokens} 토큰")
-            logger.info(f"총 컨텍스트: {self.total_context_tokens} 토큰")
-            logger.info(f"총 요약: {self.total_summary_tokens} 토큰")
-            logger.info(f"총 토큰 수: {self.total_prompt_tokens + self.total_context_tokens + self.total_summary_tokens} 토큰")
+            logger.info(f"[process_markdown] Total tokens: {self.total_prompt_tokens + self.total_context_tokens + self.total_summary_tokens} tokens")
             
-            return {
+            response = {
                 "document_id": document_id,
                 "objects": self.processed_images,
                 "status": "success"
             }
+
+            return response
             
         except Exception as e:
-            logger.error(f"Markdown processing failed: {str(e)}")
-            return {
-                "document_id": document_id,
-                "status": "error",
-                "error": str(e)
-            }
+            logger.error(f"[process_markdown] Markdown processing failed: {str(e)}")
+            raise ImageProcessingError()

@@ -11,8 +11,8 @@ logger = get_logger()
 # 진행률 저장소
 progress_store: Dict[str, Dict[str, Any]] = {}
 
+# 진행률 업데이트
 def update_progress(space_id: str, progress: int, status: Dict[str, Any] = None):
-    """진행률 업데이트"""
     if space_id not in progress_store:
         progress_store[space_id] = {
             "progress": 0,
@@ -27,7 +27,6 @@ def update_progress(space_id: str, progress: int, status: Dict[str, Any] = None)
             progress_store[space_id]["result"] = status["result"]
 
 async def progress_generator(space_id: str):
-    """SSE 이벤트 생성기"""
     # 초기 상태 설정
     if space_id not in progress_store:
         progress_store[space_id] = {
@@ -97,7 +96,7 @@ async def progress_generator(space_id: str):
                     }
             await asyncio.sleep(0.1)
     except Exception as e:
-        logger.error(f"SSE Error: {str(e)}")
+        logger.error(f"[progress_generator] SSE Error: {str(e)}")
         yield {
             "event": "error",
             "data": json.dumps({

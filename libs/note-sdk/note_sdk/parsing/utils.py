@@ -11,9 +11,8 @@ from common_sdk.get_logger import get_logger
 # 로거 설정
 logger = get_logger()
 
-"""
-유틸리티 함수 정의
-"""
+
+# 문서 분할
 class SplitPDFFilesNode(BaseNode):
 
     def __init__(self, batch_size=10, test_page=None, **kwargs):
@@ -39,17 +38,16 @@ class SplitPDFFilesNode(BaseNode):
         
         # 첫 번째 PDF 파일 사용
         pdf_path = pdf_files[0]
-        logger.info(f"Using PDF file: {pdf_path}")
+        logger.info(f"[SplitPDFFilesNode] Using PDF file: {pdf_path}")
 
         # PDF 파일 열기
         input_pdf = pymupdf.open(str(pdf_path))
         num_pages = len(input_pdf)
-        logger.info(f"File has {num_pages} pages")
+        logger.info(f"[SplitPDFFilesNode] File has {num_pages} pages")
 
         if self.test_page is not None:
             if self.test_page < num_pages:
                 num_pages = self.test_page
-                logger.info(f"Test mode: processing first {num_pages} pages")
 
         ret = []
         
@@ -60,7 +58,6 @@ class SplitPDFFilesNode(BaseNode):
 
             # 분할된 PDF 파일명 생성 (임시 디렉토리에 저장)
             output_file = os.path.join(temp_dir, f"{space_id}_{start_page:04d}_{end_page:04d}.pdf")
-            logger.info(f"PDF split: {output_file}")
 
             # 새로운 PDF 파일 생성 및 페이지 삽입
             output_pdf = pymupdf.open()
@@ -71,16 +68,16 @@ class SplitPDFFilesNode(BaseNode):
             # 파일이 실제로 생성되었는지 확인
             if os.path.exists(output_file):
                 ret.append(output_file)
-                logger.info(f"Successfully created split PDF: {output_file}")
+                logger.info(f"[SplitPDFFilesNode] Successfully created split PDF: {output_file}")
             else:
-                logger.error(f"Failed to create split PDF: {output_file}")
+                logger.error(f"[SplitPDFFilesNode] Failed to create split PDF: {output_file}")
 
         # 원본 PDF 파일 닫기
         input_pdf.close()
-        logger.info(f"PDF split completed: {len(ret)} files created")
 
         if not ret:
-            raise Exception("No split PDF files were created")
+            logger.error(f"[SplitPDFFilesNode] No split PDF files were created in {temp_dir}")
+            raise FileNotFoundError(temp_dir)
 
         return {
             "split_filepaths": ret,
@@ -90,9 +87,8 @@ class SplitPDFFilesNode(BaseNode):
             "space_id": space_id
         }
 
+    # PDF 파일을 페이지별로 분할하는 함수
     def split_pdf(self, pdf_path, output_dir, max_pages):
-        """PDF 파일을 페이지별로 분할하는 함수"""
-        # settings.get_temp_dir() 사용
         space_id = os.path.splitext(os.path.basename(pdf_path))[0]
         temp_dir = settings.get_temp_dir(space_id)
         os.makedirs(temp_dir, exist_ok=True)

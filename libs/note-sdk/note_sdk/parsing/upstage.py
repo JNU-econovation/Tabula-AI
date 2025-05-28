@@ -7,6 +7,7 @@ from note_sdk.parsing.base import BaseNode
 from note_sdk.parsing.state import ParseState
 from note_sdk.config import settings
 from common_sdk.config import settings as common_settings
+from common_sdk.exceptions import APIKeyError, ExternalConnectionError
 from common_sdk.get_logger import get_logger
 
 # 로거 설정
@@ -35,8 +36,8 @@ class DocumentParseNode(BaseNode):
         super().__init__(verbose=verbose, **kwargs)
         self.api_key = common_settings.UPSTAGE_API_KEY
         if not self.api_key:
-            logger.error("UPSTAGE_API_KEY is not set")
-            raise ValueError()
+            logger.error("[DocumentParseNode] UPSTAGE_API_KEY is not set")
+            raise APIKeyError()
         self.config = DEFAULT_CONFIG
         if use_ocr:
             self.config["ocr"] = True
@@ -54,7 +55,6 @@ class DocumentParseNode(BaseNode):
             # settings.get_temp_dir() 사용
             self.temp_dir = settings.get_temp_dir(space_id)
             os.makedirs(self.temp_dir, exist_ok=True)
-            logger.info(f"임시 디렉토리 생성: {self.temp_dir}")
 
             # API 요청 헤더 설정
             headers = {"Authorization": f"Bearer {self.api_key}"}
@@ -75,8 +75,8 @@ class DocumentParseNode(BaseNode):
                 result = response.json()
                 return result
             else:
-                logger.error(f"API request failed. Status code: {response.status_code}")
-                raise ValueError()
+                logger.error(f"[upstage_layout_analysis] API request failed. Status code: {response.status_code}")
+                raise ExternalConnectionError()
         finally:
             if 'files' in locals():
                 files['document'].close()
@@ -121,8 +121,7 @@ class DocumentParseNode(BaseNode):
         if "space_id" not in state:
             raise ValueError("space_id is required in state")
         
-        start_time = time.time()
-        logger.info(f"Start Parsing: {state['working_filepath']}")
+        # start_time = time.time()
 
         try:
             filepath = state["working_filepath"]
@@ -145,8 +144,8 @@ class DocumentParseNode(BaseNode):
                 "usage": data.pop("usage"),
             }
 
-            duration = time.time() - start_time
-            logger.info(f"Finished Parsing in {duration:.2f} seconds")
+            # duration = time.time() - start_time
+            # logger.info(f"Finished Parsing in {duration:.2f} seconds")
 
             return {
                 "metadata": [metadata],
@@ -155,8 +154,8 @@ class DocumentParseNode(BaseNode):
                 "space_id": space_id
             }
         except Exception as e:
-            logger.error(f"파싱 중 오류 발생: {str(e)}")
-            raise
+            logger.error(f"[DocumentParseNode] Parsing failed: {str(e)}")
+            raise ExternalConnectionError()
 
 
 class PostDocumentParseNode(BaseNode):
@@ -177,8 +176,6 @@ class PostDocumentParseNode(BaseNode):
 
                 post_processed_elements.append(elem)
 
-        logger.info(f"Total Post-processed Elements: {id_counter}")
-
         pages_count = 0
         metadata = state["metadata"]
 
@@ -189,16 +186,16 @@ class PostDocumentParseNode(BaseNode):
 
         total_cost = pages_count * 0.01
 
-        logger.info(f"Total Cost: ${total_cost:.2f}")
+        logger.info(f"[PostDocumentParseNode] Total Cost: ${total_cost:.2f}")
 
         # 임시 디렉토리 정리
         temp_root_dir = settings.get_temp_dir(state["filepath"])
         if os.path.exists(temp_root_dir):
             try:
                 shutil.rmtree(temp_root_dir)
-                logger.info(f"Temporary directory cleaned: {temp_root_dir}")
+                logger.info(f"[PostDocumentParseNode] Temporary directory cleaned: {temp_root_dir}")
             except Exception as e:
-                logger.error(f"Error cleaning temporary directory: {str(e)}")
+                logger.error(f"[PostDocumentParseNode] Error cleaning temporary directory: {str(e)}")
 
         # 재정렬된 elements를 state에 업데이트
         return {

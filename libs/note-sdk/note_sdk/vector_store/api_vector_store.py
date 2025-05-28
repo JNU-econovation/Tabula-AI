@@ -1,7 +1,7 @@
 import re
 import asyncio
 import json
-from pinecone import Pinecone, ServerlessSpec
+from pinecone import Pinecone
 from typing import List, Dict, Any, Literal
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from concurrent.futures import ThreadPoolExecutor
@@ -16,18 +16,12 @@ from common_sdk.get_logger import get_logger
 logger = get_logger()
 
 
+# 벡터 로더 클래스
 class VectorLoader:
     def __init__(self, language: Literal["ko", "en"], space_id: str = None):
-        """
-        Args:
-            language: 언어 설정 (ko / en)
-            space_id: 작업 ID (None이면 ObjectId로 자동 생성)
-        """
+
         self.language = language
-        # space_id가 없으면 ObjectId로 자동 생성
         self.space_id = space_id
-        
-        logger.info(f"VectorLoader initialized with language: {language}, space_id: {self.space_id}")
         
         # Pinecone 클라이언트 초기화
         self.pc = Pinecone(api_key=settings.PINECONE_API_KEY)
@@ -62,23 +56,13 @@ class VectorLoader:
             
             # 인덱스 존재 확인
             if index_name not in self.pc.list_indexes().names():
-                logger.info(f"'{index_name}' index not found, creating with dimension {dimension}")
-                # 인덱스가 없으면 생성
-                self.pc.create_index(
-                    name=index_name,
-                    dimension=dimension,
-                    metric="cosine",
-                    spec=ServerlessSpec(
-                        cloud='aws',
-                        region='us-east-1'
-                    )
-                )
-                logger.info(f"Created new dense index: {index_name}")
+                logger.error(f"[VectorLoader] '{index_name}' dense index not found")
+                raise ExternalConnectionError()
             
             return self.pc.Index(index_name)
         
         except Exception as e:
-            logger.error(f"Dense index initialization error: {e}")
+            logger.error(f"[VectorLoader] Dense index initialization error: {e}")
             raise ExternalConnectionError()
 
     def init_sparse_index(self) -> Any:
@@ -88,24 +72,15 @@ class VectorLoader:
             
             # 인덱스 존재 확인
             if index_name not in self.pc.list_indexes().names():
-                logger.info(f"'{index_name}' sparse index not found")
-                # 인덱스가 없으면 생성 (sparse는 동적 차원)
-                self.pc.create_index(
-                    name=index_name,
-                    dimension=1,  # sparse vector는 동적 차원이므로 최소값
-                    metric="dotproduct",
-                    spec=ServerlessSpec(
-                        cloud='aws',
-                        region='us-east-1'
-                    )
-                )
-                logger.info(f"Created new sparse index: {index_name}")
+                logger.error(f"[VectorLoader] '{index_name}' sparse index not found")
+                raise ExternalConnectionError()
             
             return self.pc.Index(index_name)
         
         except Exception as e:
-            logger.error(f"Sparse index initialization error: {e}")
+            logger.error(f"[VectorLoader] Sparse index initialization error: {e}")
             raise ExternalConnectionError()
+
 
     def extract_image_paths(self, content: str) -> List[Dict[str, str]]:
         pattern = r'!\[(.*?)\]\((.*?)\)'
@@ -113,9 +88,8 @@ class VectorLoader:
         imagePaths = [{"imagePath": m.group(2)} for m in matches]
         
         if not imagePaths:
-            logger.info("No image paths found in content")
-        else:
-            logger.info(f"Found {len(imagePaths)} image paths")
+            logger.info(f"[VectorLoader] No image paths found in content")
+            return []
         
         return imagePaths
 
@@ -150,18 +124,18 @@ class VectorLoader:
                     sparse_embedding = sparse_result[0]
                     
                     if not sparse_embedding or 'indices' not in sparse_embedding or 'values' not in sparse_embedding:
-                        logger.warning(f"Invalid sparse embedding structure for chunk {chunkId}")
+                        logger.warning(f"[VectorLoader] Invalid sparse embedding structure for chunk {chunkId}")
                         sparse_embedding = None
                     elif len(sparse_embedding['indices']) == 0 or len(sparse_embedding['values']) == 0:
-                        logger.warning(f"Empty sparse embedding for chunk {chunkId}")
+                        logger.warning(f"[VectorLoader] Empty sparse embedding for chunk {chunkId}")
                         sparse_embedding = None
                     else:
-                        logger.info(f"Valid sparse embedding for chunk {chunkId}")
+                        logger.info(f"[VectorLoader] Valid sparse embedding for chunk {chunkId}")
                 else:
-                    logger.warning(f"BM25 encode_documents returned empty result for chunk {chunkId}")
+                    logger.warning(f"[VectorLoader] BM25 encode_documents returned empty result for chunk {chunkId}")
                     
             except Exception as e:
-                logger.error(f"Sparse embedding error for chunk {chunkId}: {e}")
+                logger.error(f"[VectorLoader] Sparse embedding error for chunk {chunkId}: {e}")
                 sparse_embedding = None
             
             # 4. 메타데이터 구성
@@ -182,8 +156,7 @@ class VectorLoader:
                 "values": dense_embedding,
                 "metadata": metadata
             }
-            
-            logger.info(f"Processing chunk {chunkId} with spaceId: {self.space_id}")
+
             dense_task = asyncio.create_task(self.upsert_dense_vector(dense_vector))
             
             # 6. Sparse 벡터 처리 (성공한 경우에만)
@@ -199,7 +172,7 @@ class VectorLoader:
                 }
                 sparse_task = asyncio.create_task(self.upsert_sparse_vector(sparse_vector))
             else:
-                logger.info(f"Skipping sparse vector for chunk {chunkId} due to empty embedding")
+                logger.info(f"[VectorLoader] Skipping sparse vector for chunk {chunkId} due to empty embedding")
             
             # 7. 병렬 실행
             if sparse_task:
@@ -210,17 +183,17 @@ class VectorLoader:
             return True
             
         except Exception as e:
-            logger.error(f"Chunk processing error: {e}")
+            logger.error(f"[VectorLoader] Chunk processing error: {e}")
             return False
 
     async def upsert_dense_vector(self, vector: Dict[str, Any]) -> bool:
         try:
             self.dense_index.upsert(vectors=[vector], namespace="documents")
             self.processed_vectors["text"]["dense"] += 1
-            logger.info(f"Successfully upserted dense vector: {vector['id']}")
+            logger.info(f"[VectorLoader] Successfully upserted dense vector: {vector['id']}")
             return True
         except Exception as e:
-            logger.error(f"Dense vector upsertion error: {e}")
+            logger.error(f"[VectorLoader] Dense vector upsertion error: {e}")
             return False
 
     async def upsert_sparse_vector(self, sparse_vector: Dict) -> bool:
@@ -231,7 +204,7 @@ class VectorLoader:
             values = sparse_values.get('values', [])
             
             if not indices or not values or len(indices) != len(values):
-                logger.warning(f"Invalid sparse vector data: indices={len(indices)}, values={len(values)}")
+                logger.warning(f"[VectorLoader] Invalid sparse vector data: indices={len(indices)}, values={len(values)}")
                 return False
             
             # Pinecone에 업서트
@@ -244,10 +217,10 @@ class VectorLoader:
                 namespace='documents'
             )
             self.processed_vectors["text"]["sparse"] += 1
-            logger.info(f"Successfully upserted sparse vector: {sparse_vector['id']}")
+            logger.info(f"[VectorLoader] Successfully upserted sparse vector: {sparse_vector['id']}")
             return True
         except Exception as e:
-            logger.error(f"Sparse vector upsertion error: {str(e)}")
+            logger.error(f"[VectorLoader] Sparse vector upsertion error: {str(e)}")
             return False
 
     async def process_markdown(self, content: str, document_id: str) -> bool:
@@ -270,16 +243,15 @@ class VectorLoader:
             # 빈 청크 필터링
             non_empty_chunks = [chunk.strip() for chunk in chunks if chunk.strip()]
             if not non_empty_chunks:
-                logger.warning("All chunks are empty after filtering")
+                logger.error(f"[VectorLoader] All chunks are empty after filtering")
                 return False
                 
             logger.info(f"Fitting BM25 encoder with {len(non_empty_chunks)} non-empty chunks")
             
             try:
                 self.bm25.fit(non_empty_chunks)
-                logger.info("BM25 encoder fitted successfully")
             except Exception as e:
-                logger.error(f"BM25 encoder fitting failed: {e}")
+                logger.error(f"[VectorLoader] BM25 encoder fitting failed: {e}")
                 return False
             
             # 4. 청크별 파이프라인 처리
@@ -291,21 +263,20 @@ class VectorLoader:
                     )
                     tasks.append(task)
                 else:
-                    logger.warning(f"Skipping empty chunk {i + 1}")
+                    logger.info(f"[VectorLoader] Skipping empty chunk {i + 1}")
             
             if not tasks:
-                logger.warning("No valid chunks to process")
+                logger.error(f"[VectorLoader] No valid chunks to process")
                 return False
             
             # 5. 모든 청크 처리 완료 대기
             results = await asyncio.gather(*tasks)
             success_count = sum(results)
             
-            logger.info(f"Processed {success_count}/{len(tasks)} chunks successfully")
-            logger.info(f"Total images found: {len(imagePaths)}")
+            logger.info(f"[VectorLoader] Processed {success_count}/{len(tasks)} chunks successfully")
             
             return all(results)
             
         except Exception as e:
-            logger.error(f"Markdown processing error: {e}")
+            logger.error(f"[VectorLoader] Markdown processing error: {e}")
             return False
