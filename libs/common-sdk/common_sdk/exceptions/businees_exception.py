@@ -170,7 +170,7 @@ class MissingTaskId(HTTPException):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
-                "code": "TASK_400_1", 
+                "code": "SPACE_400_2", 
                 "reason": "Request-Header에 taskId가 누락되었습니다.", 
                 "http_status": status.HTTP_400_BAD_REQUEST
             }
@@ -182,7 +182,7 @@ class TaskIdNotFound(HTTPException):
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
-                "code": "TASK_404_1", 
+                "code": "SPACE_404_1", 
                 "reason": "요청 데이터(taskId)에 해당하는 리소스가 존재하지 않습니다.", 
                 "http_status": status.HTTP_404_NOT_FOUND
             }

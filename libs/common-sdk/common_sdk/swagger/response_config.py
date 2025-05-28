@@ -120,22 +120,22 @@ note_service_response = {
     }
 }
 
-# Note Service Task 응답 구성
-note_service_task_response = {
+# Note Service Space 응답 구성
+note_service_space_response = {
     **security_responses,
     400: {
         "description": "요청 데이터 오류",
         "content": {
             "application/json": {
                 "examples": {
-                    "MissingTaskId": {
-                        "summary": "Task ID 누락",
+                    "MissingSpaceId": {
+                        "summary": "Space ID 누락",
                         "value": {
                             "success": False,
                             "response": None,
                             "error": {
-                                "code": "TASK_400_1",
-                                "reason": "Request-Header에 taskId가 누락되었습니다.",
+                                "code": "SPACE_400_2",
+                                "reason": "Request-Header에 spaceId가 누락되었습니다.",
                                 "http_status": status.HTTP_400_BAD_REQUEST
                             }
                         }
@@ -149,14 +149,14 @@ note_service_task_response = {
         "content": {
             "application/json": {
                 "examples": {
-                    "TaskIdNotFound": {
-                        "summary": "Task ID 미존재",
+                    "SpaceIdNotFound": {
+                        "summary": "Space ID 미존재",
                         "value": {
                             "success": False,
                             "response": None,
                             "error": {
-                                "code": "TASK_404_1",
-                                "reason": "요청 데이터(taskId)에 해당하는 리소스가 존재하지 않습니다.",
+                                "code": "SPACE_404_1",
+                                "reason": "요청 데이터(spaceId)에 해당하는 리소스가 존재하지 않습니다.",
                                 "http_status": status.HTTP_404_NOT_FOUND
                             }
                         }
@@ -238,8 +238,8 @@ result_service_response = {
     }
 }
 
-# Result Service Task 응답 구성
-result_service_task_response = {
+# Result Service Space 응답 구성
+result_service_space_response = {
     **security_responses,
     400: {
         "description": "요청 데이터 오류",
@@ -247,13 +247,13 @@ result_service_task_response = {
             "application/json": {
                 "examples": {
                     "MissingTaskId": {
-                        "summary": "Task ID 누락",
+                        "summary": "Space ID 누락",
                         "value": {
                             "success": False,
                             "response": None,
                             "error": {
-                                "code": "TASK_400_1",
-                                "reason": "Request-Header에 taskId가 누락되었습니다.",
+                                "code": "SPACE_400_2",
+                                "reason": "Request-Header에 spaceId가 누락되었습니다.",
                                 "http_status": status.HTTP_400_BAD_REQUEST
                             }
                         }
@@ -268,13 +268,13 @@ result_service_task_response = {
             "application/json": {
                 "examples": {
                     "TaskIdNotFound": {
-                        "summary": "Task ID 미존재",
+                        "summary": "Space ID 미존재",
                         "value": {
                             "success": False,
                             "response": None,
                             "error": {
-                                "code": "TASK_404_1",
-                                "reason": "요청 데이터(taskId)에 해당하는 리소스가 존재하지 않습니다.",
+                                "code": "SPACE_404_1",
+                                "reason": "요청 데이터(spaceId)에 해당하는 리소스가 존재하지 않습니다.",
                                 "http_status": status.HTTP_404_NOT_FOUND
                             }
                         }
