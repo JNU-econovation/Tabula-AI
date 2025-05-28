@@ -73,3 +73,91 @@ class S3Storage:
         except Exception as e:
             logger.error(f"[upload_note_file] User: {user_id} - Failed to upload: {str(e)}")
             raise UploadFailedError()
+        
+    # 원본 이미지 업로드 (origin)
+    def upload_origin_image(self, file_path: str, user_id: int, space_id: str, result_id: str, page: int) -> Dict[str, Any]:
+        """
+        Args:
+            file_path (str): 업로드할 이미지 파일 경로(png)
+            user_id (int): 사용자 ID
+            space_id (str): 학습 공간 ID
+            result_id (str): 결과 ID
+            page (int): 페이지 번호
+            
+        Returns:
+            Dict[str, Any]: {
+                "s3_key": str,  # S3에 저장된 파일의 키
+                "bucket": str,  # S3 버킷 이름
+                "url": str      # S3 파일 URL
+            }
+        """
+        try:
+            # S3 경로 생성: image/origin/{userId}/{spaceId}/{resultId}/{id}.png
+            s3_key = f"image/origin/{user_id}/{space_id}/{result_id}/{page}.png"
+            
+            # 파일 업로드
+            self.client.upload_file(
+                file_path,
+                self.bucket,
+                s3_key,
+                ExtraArgs={'ContentType': 'image/png'}
+            )
+            
+            # S3 URL 생성
+            s3_url = f"https://{self.bucket}.s3.{settings.AWS_REGION}.amazonaws.com/{s3_key}"
+            
+            logger.info(f"User: {user_id} Origin image uploaded successfully to S3 - {s3_key}")
+            
+            return {
+                "s3_key": s3_key,
+                "bucket": self.bucket,
+                "url": s3_url
+            }
+            
+        except Exception as e:
+            logger.error(f"User: {user_id} Origin image upload failed to S3 - {str(e)}")
+            raise UploadFailedError()
+        
+    # 하이라이트 이미지 업로드 (post)
+    def upload_post_image(self, file_path: str, user_id: int, space_id: str, result_id: str, page: int) -> Dict[str, Any]:
+        """
+        Args:
+            file_path (str): 업로드할 하이라이트 이미지 파일 경로(png)
+            user_id (int): 사용자 ID
+            space_id (str): 학습 공간 ID
+            result_id (str): 결과 ID
+            page (int): 페이지 번호
+            
+        Returns:
+            Dict[str, Any]: {
+                "s3_key": str,  # S3에 저장된 파일의 키
+                "bucket": str,  # S3 버킷 이름
+                "url": str      # S3 파일 URL
+            }
+        """
+        try:
+            # S3 경로 생성: image/post/{userId}/{spaceId}/{resultId}/{id}.png
+            s3_key = f"images/post/{user_id}/{space_id}/{result_id}/{page}.png"
+            
+            # 파일 업로드
+            self.client.upload_file(
+                file_path,
+                self.bucket,
+                s3_key,
+                ExtraArgs={'ContentType': 'image/png'}
+            )
+            
+            # S3 URL 생성
+            s3_url = f"https://{self.bucket}.s3.{settings.AWS_REGION}.amazonaws.com/{s3_key}"
+            
+            logger.info(f"User: {user_id} Post image uploaded successfully to S3 - {s3_key}")
+            
+            return {
+                "s3_key": s3_key,
+                "bucket": self.bucket,
+                "url": s3_url
+            }
+            
+        except Exception as e:
+            logger.error(f"User: {user_id} Post image upload failed to S3 - {str(e)}")
+            raise UploadFailedError()
