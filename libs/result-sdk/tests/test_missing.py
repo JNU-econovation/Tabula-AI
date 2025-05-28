@@ -3,10 +3,10 @@ import json
 import asyncio
 from pathlib import Path
 from datetime import datetime
-from bson import ObjectId
 
-from common_sdk import get_logger, MongoDB
+from common_sdk import get_logger
 from result_sdk import DataProcessor, MissingAnalysisWorkflow, MissingAnalyzer
+from common_sdk.crud.mongodb import MongoDB
 
 logger = get_logger()
 
@@ -17,9 +17,6 @@ class TestMissingAnalysis:
         self.test_data_dir = Path(__file__).parent / "data"
         self.test_id = f"missing_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
-        # MongoDB 연결
-        self.mongodb = MongoDB()
-
         # 테스트용 space_id 설정
         self.test_space_id = test_space_id
         
@@ -29,10 +26,9 @@ class TestMissingAnalysis:
         # 사용자 입력 데이터 로드
         self.user_inputs = self._load_user_inputs()
 
-        # MongoDB에서 키워드 데이터 로드 (space_id가 있는 경우)
+        # MongoDB에서 키워드 데이터 로드할 때 사용할 인스턴스
+        self.mongodb = None
         self.keyword_data = None
-        if self.test_space_id:
-            asyncio.create_task(self._load_keyword_data_from_db())
 
     def _validate_test_data_files(self):
         """테스트 데이터 파일 존재 확인"""
@@ -54,20 +50,22 @@ class TestMissingAnalysis:
         logger.info(f"User input file found: {user_input_file}")
 
     async def _load_keyword_data_from_db(self):
-        """MongoDB에서 키워드 데이터 로드"""
+        """MongoDB에서 키워드 데이터 로드 (crud.py 사용)"""
 
         if not self.test_space_id:
             return None
 
         try:
-            collection = self.mongodb.db.spaces
-            document = await collection.find_one({"_id": ObjectId(self.test_space_id)})
+            if not self.mongodb:
+                self.mongodb = MongoDB()
             
-            if document:
-                self.keyword_data = document.get("keyword", [])
+            keyword_data = await self.mongodb.get_space_keywords(self.test_space_id)
+            
+            if keyword_data:
+                self.keyword_data = keyword_data
                 logger.info(f"Keyword data loaded: {len(self.keyword_data)} items")
             else:
-                logger.warning(f"No document found for space_id: {self.test_space_id}")
+                logger.warning(f"No keyword data found for space_id: {self.test_space_id}")
                 
         except Exception as e:
             logger.error(f"Failed to load keyword data: {e}")
@@ -93,23 +91,25 @@ class TestMissingAnalysis:
             raise RuntimeError(f"Failed to load user input data: {e}")
         
     async def test_mongodb_connection(self):
-        """MongoDB 연결 테스트"""
+        """MongoDB 연결 테스트 (crud.py 통해)"""
         logger.info("\n=== Testing MongoDB Connection ===")
         
         try:
-            # 연결 테스트
-            collection = self.mongodb.db.spaces
-            count = await collection.count_documents({})
-            logger.info(f"MongoDB connection successful, spaces collection has {count} documents")
+            if not self.mongodb:
+                self.mongodb = MongoDB()
             
-            # 테스트 space_id가 있는 경우 해당 문서 확인
+            # 연결 테스트
+            connection_status = self.mongodb.check_connection()
+            logger.info(f"MongoDB connection status: {connection_status}")
+            
+            # 테스트 space_id가 있는 경우 키워드 데이터 조회 테스트
             if self.test_space_id:
-                document = await collection.find_one({"_id": ObjectId(self.test_space_id)})
-                if document:
-                    keyword_count = len(document.get("keyword", []))
+                keyword_data = await self.mongodb.get_space_keywords(self.test_space_id)
+                if keyword_data:
+                    keyword_count = len(keyword_data)
                     logger.info(f"Keyword count in test document: {keyword_count}")
                 else:
-                    logger.warning(f"Test space document not found: {self.test_space_id}")
+                    logger.warning(f"Test space document not found or no keywords: {self.test_space_id}")
             
             logger.info("MongoDB connection test PASSED")
             return True
@@ -123,6 +123,7 @@ class TestMissingAnalysis:
         logger.info("\n=== Testing DataProcessor ===")
 
         if not self.keyword_data:
+            logger.warning("No keyword data available for DataProcessor test")
             return None
         
         try:
@@ -171,7 +172,7 @@ class TestMissingAnalysis:
         
         workflow = MissingAnalysisWorkflow()
 
-        # MongoDB 연결 확인
+        # MongoDB 연결 확인 (crud.py를 통해)
         assert workflow.nodes.mongodb is not None
 
         # 프롬프트 로드 테스트
@@ -190,6 +191,7 @@ class TestMissingAnalysis:
         logger.info("\n=== Testing Workflow Nodes ===")
 
         if not self.test_space_id:
+            logger.warning("No test_space_id provided for workflow nodes test")
             return None
         
         workflow = MissingAnalysisWorkflow()
@@ -211,8 +213,7 @@ class TestMissingAnalysis:
         assert state["missing_items"] == [] and state["error"] is None
         logger.info("Initialize node test completed")
             
-
-        # MongoDB 키워드 로드 노드 테스트
+        # MongoDB 키워드 로드 노드 테스트 (crud.py 통해)
         state = await workflow.nodes.load_keywords_from_db(state)
         if state.get("error"):
             logger.error(f"Load keywords failed: {state['error']}")
@@ -254,6 +255,7 @@ class TestMissingAnalysis:
         logger.info("=== Testing Full Analysis with Real OpenAI API ===")
 
         if not self.test_space_id:
+            logger.warning("No test_space_id provided for full analysis test")
             return None
         
         try:
@@ -320,10 +322,10 @@ class TestMissingAnalysis:
         total_start_time = datetime.now()
         
         try:
-            # 1. MongoDB 연결 테스트
+            # 1. MongoDB 연결 테스트 (crud.py 통해)
             mongodb_result = await self.test_mongodb_connection()
             
-            # 2. MongoDB에서 키워드 데이터 로드 (space_id가 있는 경우)
+            # 2. MongoDB에서 키워드 데이터 로드 (space_id가 있는 경우, crud.py 통해)
             if self.test_space_id:
                 await self._load_keyword_data_from_db()
             
@@ -383,7 +385,7 @@ class TestMissingAnalysis:
 async def main():
     """메인 테스트 실행 함수"""
     logger.info("Missing Analysis Integration Test")
-    logger.info("Testing all components")
+    logger.info("Testing all components with separated CRUD logic")
     
     # 환경 확인
     print("Environment check:")
@@ -413,7 +415,7 @@ async def main():
         logger.error(f"settings import error: {e}")
         return
     
-    test_space_id = "683452ecfedddd4240836541" # MongoDB _id 값
+    test_space_id = "507f191e810c19729de860ea" # MongoDB _id 값
 
     if test_space_id:
         logger.info(f"Using test space_id: {test_space_id}")

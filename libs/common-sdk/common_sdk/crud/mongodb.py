@@ -1,5 +1,5 @@
 import pytz
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, List
 from motor.motor_asyncio import AsyncIOMotorClient, AsyncIOMotorDatabase
 from pymongo import MongoClient
 from datetime import datetime
@@ -115,6 +115,35 @@ class MongoDB:
         except Exception as e:
             logger.error(f"Failed to get language type for space {space_id}: {str(e)}")
             raise
+
+    # 학습 공간 키워드 조회
+    async def get_space_keywords(self, space_id: str) -> List[Dict[str, Any]]:
+        """MongoDB에서 space_id를 통해 키워드 데이터 조회"""
+        try:
+            # space_id를 ObjectId로 변환
+            object_id = ObjectId(space_id)
+            
+            # spaces 컬렉션에서 해당 document 조회
+            collection = self.db.spaces
+            document = await collection.find_one({"_id": object_id})
+            
+            if not document:
+                logger.warning(f"No document found for space_id: {space_id}")
+                return []
+            
+            # keyword 필드 추출
+            keyword_data = document.get("keyword", [])
+            
+            if not isinstance(keyword_data, list):
+                logger.warning(f"keyword field is not a list for space_id: {space_id}")
+                return []
+            
+            logger.info(f"Retrieved {len(keyword_data)} keyword items for space_id: {space_id}")
+            return keyword_data
+            
+        except Exception as e:
+            logger.error(f"Failed to fetch keyword data from MongoDB: {e}")
+            return []
 
     # 학습 결과물 저장
     def create_result(self,

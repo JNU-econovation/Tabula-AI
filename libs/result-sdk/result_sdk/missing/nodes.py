@@ -2,8 +2,9 @@ import json
 from typing import Dict, Any, List
 from openai import OpenAI
 
-from common_sdk import get_logger, PromptLoader, settings, MongoDB
+from common_sdk import get_logger, PromptLoader, settings
 from .processor import DataProcessor
+from common_sdk.crud.mongodb import MongoDB
 
 logger = get_logger()
 
@@ -29,31 +30,6 @@ class MissingAnalysisNodes:
             logger.error(f"failed to load prompt: {e}")
             return None
     
-    async def fetch_keyword_data(self, space_id: str) -> List[Dict[str, Any]]:
-        """MongoDB에서 키워드 데이터 조회"""
-        try:
-            from bson import ObjectId
-            
-            collection = self.mongodb.db.spaces
-            document = await collection.find_one({"_id": ObjectId(space_id)})
-            
-            if not document:
-                logger.warning(f"No document found for space_id: {space_id}")
-                return []
-            
-            keyword_data = document.get("keyword", [])
-            
-            if not isinstance(keyword_data, list):
-                logger.warning(f"keyword field is not a list for space_id: {space_id}")
-                return []
-            
-            logger.info(f"Retrieved {len(keyword_data)} keyword items for space_id: {space_id}")
-            return keyword_data
-            
-        except Exception as e:
-            logger.error(f"Failed to fetch keyword data from MongoDB: {e}")
-            return []
-    
     async def initialize(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """초기 설정 및 초기화 노드"""
         state["missing_items"] = []
@@ -71,7 +47,7 @@ class MissingAnalysisNodes:
             if not space_id:
                 raise ValueError("space_id does not exist")
             
-            keyword_data = await self.fetch_keyword_data(space_id)
+            keyword_data = await self.mongodb.get_space_keywords(space_id)
             
             if not keyword_data:
                 raise ValueError(f"Keyword data not found for space_id {space_id}")
