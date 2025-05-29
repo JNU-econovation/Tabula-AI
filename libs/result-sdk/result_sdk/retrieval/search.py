@@ -1,4 +1,7 @@
-from typing import List, Optional
+# search.py
+
+import json
+from typing import List, Optional, Dict, Any
 from pinecone import Pinecone
 from pinecone_text.sparse import BM25Encoder
 from .models import SearchResult, HybridSearchResponse, RetrievalConfig
@@ -11,21 +14,40 @@ logger = get_logger()
 class PineconeSearcher:
     """Pinecone을 사용한 벡터 검색 클래스"""
     
-    def __init__(self):
+    def __init__(self, language: str = "ko"):
         self.api_key = settings.PINECONE_API_KEY
         self.pc = Pinecone(api_key=self.api_key)
-        self.index_name = settings.INDEX_NAME
+        self.language = language
         self.logger = get_logger()
-        self._index = None  # 인덱스 캐싱용
+        
+        # 언어별 Dense 차원 설정
+        if language == "ko":
+            self.dense_vector_dimension = 4096  # Upstage 임베딩
+        else:  # "en"
+            self.dense_vector_dimension = 3072  # OpenAI 3-large 임베딩
+        
+        # Dense/Sparse 인덱스 이름 설정
+        if language == "ko":
+            self.dense_index_name = settings.INDEX_NAME_KOR_DEN_CONTENTS
+            self.sparse_index_name = settings.INDEX_NAME_KOR_SPA_CONTENTS
+        else:
+            self.dense_index_name = settings.INDEX_NAME_ENG_DEN_CONTENTS
+            self.sparse_index_name = settings.INDEX_NAME_ENG_SPA_CONTENTS
+        
+        self._dense_index = None  # Dense 인덱스 캐싱용
+        self._sparse_index = None  # Sparse 인덱스 캐싱용
 
-    def get_index(self, index_name: Optional[str] = None):
-        """Pinecone 인덱스 객체 반환"""
-        target_index_name = index_name or self.index_name
-        
-        if self._index is None or getattr(self._index, 'name', None) != target_index_name:
-            self._index = self.pc.Index(target_index_name)
-        
-        return self._index
+    def get_dense_index(self):
+        """Dense Pinecone 인덱스 객체 반환"""
+        if self._dense_index is None:
+            self._dense_index = self.pc.Index(self.dense_index_name)
+        return self._dense_index
+    
+    def get_sparse_index(self):
+        """Sparse Pinecone 인덱스 객체 반환"""
+        if self._sparse_index is None:
+            self._sparse_index = self.pc.Index(self.sparse_index_name)
+        return self._sparse_index
     
     def list_indexes(self):
         """사용 가능한 인덱스 목록 반환"""
@@ -51,7 +73,7 @@ class PineconeSearcher:
             if not self.index_exists(index_name):
                 return None
             
-            index = self.get_index(index_name)
+            index = self.pc.Index(index_name)
             stats = index.describe_index_stats()
             return {
                 "name": index_name,
@@ -63,6 +85,98 @@ class PineconeSearcher:
             self.logger.error(f"Failed to get index info: {str(e)}")
             return None
     
+    def dense_search(self, 
+        query: str, 
+        config: RetrievalConfig,
+        language: str = "ko"
+    ) -> List[SearchResult]:
+        """Dense 벡터 검색 수행"""
+        try:
+            # Dense 벡터 생성
+            dense_vector = get_embedding(query, language=language)
+            
+            # Dense 인덱스에서 검색
+            dense_index = self.get_dense_index()
+            filter_dict = {"spaceId": config.space_id}
+            
+            results = dense_index.query(
+                vector=dense_vector,
+                top_k=config.top_k,
+                include_metadata=True,
+                filter=filter_dict,
+                namespace="documents"
+            )
+            
+            # 결과 변환 및 이미지 콘텐츠 추가
+            search_results = []
+            if results and results.matches:
+                for match in results.matches:
+                    enhanced_content = self.enhance_content_with_images(
+                        match.metadata.get("content", ""),
+                        match.metadata,
+                        config.space_id
+                    )
+                    search_results.append(SearchResult(
+                        content=enhanced_content,
+                        score=match.score,
+                        metadata=match.metadata
+                    ))
+            
+            return search_results
+            
+        except Exception as e:
+            self.logger.error(f"Dense search error: {str(e)}")
+            return []
+    
+    def sparse_search(self, 
+        query: str, 
+        config: RetrievalConfig,
+        bm25_encoder: BM25Encoder
+    ) -> List[SearchResult]:
+        """Sparse 벡터 검색 수행"""
+        try:
+            # Sparse 벡터 생성
+            sparse_vector = bm25_encoder.encode_queries([query])[0]
+            
+            # Sparse 인덱스에서 검색
+            sparse_index = self.get_sparse_index()
+            filter_dict = {"spaceId": config.space_id}
+            
+            # sparse_values 형태로 변환
+            sparse_values = {
+                "indices": sparse_vector['indices'],
+                "values": sparse_vector['values']
+            }
+            
+            results = sparse_index.query(
+                sparse_vector=sparse_values,
+                top_k=config.top_k,
+                include_metadata=True,
+                filter=filter_dict,
+                namespace="documents"
+            )
+            
+            # 결과 변환 및 이미지 콘텐츠 추가
+            search_results = []
+            if results and results.matches:
+                for match in results.matches:
+                    enhanced_content = self.enhance_content_with_images(
+                        match.metadata.get("content", ""),
+                        match.metadata,
+                        config.space_id
+                    )
+                    search_results.append(SearchResult(
+                        content=enhanced_content,
+                        score=match.score,
+                        metadata=match.metadata
+                    ))
+            
+            return search_results
+            
+        except Exception as e:
+            self.logger.error(f"Sparse search error: {str(e)}")
+            return []
+    
     def hybrid_search(self, 
         query: str, 
         config: RetrievalConfig,
@@ -71,44 +185,165 @@ class PineconeSearcher:
     ) -> HybridSearchResponse:
         """하이브리드 검색 (Dense + Sparse) 수행"""
         try:
-            # Dense 벡터 생성
-            dense_vector = get_embedding(query, language=language)
+            # Dense와 Sparse 검색을 별도로 수행
+            dense_results = self.dense_search(query, config, language)
+            sparse_results = self.sparse_search(query, config, bm25_encoder)
             
-            # Sparse 벡터 생성
-            sparse_vector = bm25_encoder.encode_queries([query])[0]
-            
-            # Pinecone 인덱스 객체 가져오기
-            index = self.get_index(config.index_name)
-            filter_dict = {"document_id": config.document_id}
-            
-            results = index.query(
-                vector=dense_vector,
-                sparse_vector=sparse_vector,
-                top_k=config.top_k,
-                include_metadata=True,
-                filter=filter_dict,
-                alpha=config.alpha
+            # 결과 합치기 및 가중치 적용
+            combined_results = self.combine_results(
+                dense_results, 
+                sparse_results, 
+                config.alpha
             )
             
-            # 결과 변환
-            search_results = []
-            if results and results.matches:
-                for match in results.matches:
-                    search_results.append(SearchResult(
-                        content=match.metadata.get("content", ""),
-                        score=match.score,
-                        metadata=match.metadata
-                    ))
+            # top_k만큼 반환
+            final_results = combined_results[:config.top_k]
             
             return HybridSearchResponse(
-                matches=search_results,
-                total_count=len(search_results)
+                matches=final_results,
+                total_count=len(final_results)
             )
             
         except Exception as e:
             self.logger.error(f"Hybrid search error: {str(e)}")
             return HybridSearchResponse(matches=[], total_count=0)
     
+    def combine_results(self, 
+        dense_results: List[SearchResult], 
+        sparse_results: List[SearchResult], 
+        alpha: float = 0.5
+    ) -> List[SearchResult]:
+        """Dense와 Sparse 결과를 조합"""
+        try:
+            # ID별로 결과 정리
+            combined_scores = {}
+            
+            # Dense 결과 처리 (alpha 가중치 적용)
+            for result in dense_results:
+                result_id = self.get_result_id(result.metadata)
+                combined_scores[result_id] = {
+                    'content': result.content,  # 이미 enhance된 콘텐츠
+                    'metadata': result.metadata,
+                    'dense_score': result.score * alpha,
+                    'sparse_score': 0.0
+                }
+            
+            # Sparse 결과 처리 ((1-alpha) 가중치 적용)
+            for result in sparse_results:
+                result_id = self.get_result_id(result.metadata)
+                if result_id in combined_scores:
+                    combined_scores[result_id]['sparse_score'] = result.score * (1 - alpha)
+                else:
+                    combined_scores[result_id] = {
+                        'content': result.content,  # 이미 enhance된 콘텐츠
+                        'metadata': result.metadata,
+                        'dense_score': 0.0,
+                        'sparse_score': result.score * (1 - alpha)
+                    }
+            
+            # 최종 점수 계산 및 정렬
+            final_results = []
+            for result_data in combined_scores.values():
+                final_score = result_data['dense_score'] + result_data['sparse_score']
+                final_results.append(SearchResult(
+                    content=result_data['content'],
+                    score=final_score,
+                    metadata=result_data['metadata']
+                ))
+            
+            # 점수순으로 정렬
+            final_results.sort(key=lambda x: x.score, reverse=True)
+            
+            return final_results
+            
+        except Exception as e:
+            self.logger.error(f"Results combination error: {str(e)}")
+            return []
+    
+    def get_result_id(self, metadata: Dict[str, Any]) -> str:
+        """결과의 고유 ID 생성"""
+        space_id = metadata.get('spaceId', '')
+        chunk_id = metadata.get('chunkId', '')
+        content_type = metadata.get('type', '')
+        return f"{space_id}_{chunk_id}_{content_type}"
+    
+    def enhance_content_with_images(self, text_content: str, metadata: Dict[str, Any], space_id: str) -> str:
+        """텍스트 콘텐츠에 관련 이미지 설명 추가"""
+        try:
+            # imageReferences가 있는지 확인
+            image_references_str = metadata.get('imageReferences', '')
+            
+            if not image_references_str:
+                return text_content
+            
+            # JSON 문자열을 파싱하여 리스트로 변환
+            try:
+                image_references = json.loads(image_references_str)
+            except (json.JSONDecodeError, TypeError):
+                self.logger.error(f"Failed to parse imageReferences JSON: {image_references_str}")
+                return text_content
+            
+            # 이미지 콘텐츠 조회
+            image_contents = []
+            for image_ref in image_references:
+                # image_ref는 {"imagePath": "경로"} 형태의 딕셔너리
+                if isinstance(image_ref, dict) and 'imagePath' in image_ref:
+                    image_path = image_ref['imagePath']
+                    image_content = self.get_image_content(image_path, space_id)
+                    if image_content:
+                        image_contents.append(f"[이미지 설명: {image_content}]")
+                elif isinstance(image_ref, str):
+                    # 혹시 문자열로 저장된 경우도 처리
+                    image_content = self.get_image_content(image_ref, space_id)
+                    if image_content:
+                        image_contents.append(f"[이미지 설명: {image_content}]")
+            
+            # 텍스트 콘텐츠와 이미지 설명 결합
+            if image_contents:
+                enhanced_content = text_content + "\n\n" + "\n".join(image_contents)
+                return enhanced_content
+            
+            return text_content
+            
+        except Exception as e:
+            self.logger.error(f"Error enhancing content with images: {str(e)}")
+            return text_content
+    
+    def get_image_content(self, image_path: str, space_id: str) -> Optional[str]:
+        """특정 이미지 경로에 해당하는 이미지 콘텐츠 조회"""
+        try:
+            # Dense 인덱스에서 이미지 타입 검색
+            dense_index = self.get_dense_index()
+            
+            # 이미지 타입이고 해당 imagePath를 가진 벡터 검색
+            filter_dict = {
+                "spaceId": space_id,
+                "type": "image",
+                "imagePath": image_path
+            }
+            
+            # Dense 차원에 맞는 더미 벡터 생성
+            dummy_vector = [0.0] * self.dense_vector_dimension
+            
+            results = dense_index.query(
+                vector=dummy_vector,  # 언어별 Dense 차원 사용
+                top_k=1,
+                include_metadata=True,
+                filter=filter_dict,
+                namespace="documents"
+            )
+            
+            if results and results.matches and len(results.matches) > 0:
+                return results.matches[0].metadata.get("content", "")
+            
+            # 이미지를 찾지 못한 경우 경고만 로그
+            self.logger.warning(f"No image found for path: {image_path} in space: {space_id}")
+            return None
+            
+        except Exception as e:
+            self.logger.warning(f"Image content not found for {image_path}: {str(e)}")
+            return None
+
 class BM25Manager:
     """BM25 인코더 관리 클래스"""
     
@@ -140,8 +375,8 @@ class BM25Manager:
 class DocumentFinder:
     """문서 검색을 위한 통합 클래스"""
     
-    def __init__(self):
-        self.pinecone_searcher = PineconeSearcher()
+    def __init__(self, language: str = "ko"):
+        self.pinecone_searcher = PineconeSearcher(language)
         self.bm25_manager = BM25Manager()
         self.logger = get_logger()
     

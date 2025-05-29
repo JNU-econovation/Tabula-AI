@@ -20,15 +20,21 @@ from common_sdk import get_logger
 logger = get_logger()
 
 class TestGradingSystem:
-    def __init__(self, test_document_id: str = "5481b11f-ea69-4314-a922-2d1b99ce3c9d", test_index_name: str = None):
+    def __init__(self, test_space_id: str = "6836e430e72c844ede76e9f5", test_index_name: str = None, lang_type: str = "ko"):
         """테스트 초기화"""
         
         self.test_data_dir = Path(__file__).parent / "data"
         self.test_id = f"grading_test_{datetime.now().strftime('%Y%m%d_%H%M%S')}"
         
         # 테스트용 설정
-        self.test_document_id = test_document_id
-        self.test_index_name = test_index_name or settings.INDEX_NAME
+        self.test_space_id = test_space_id
+        self.lang_type = lang_type  # 언어 타입 저장
+        
+        # 언어 타입에 따른 인덱스 이름 설정
+        if test_index_name:
+            self.test_index_name = test_index_name
+        else:
+            self.test_index_name = self._get_index_name_by_language(lang_type)
         
         # 테스트 데이터 파일 존재 확인
         self._validate_test_data_files()
@@ -36,6 +42,28 @@ class TestGradingSystem:
         # 테스트 데이터 로드
         self.user_inputs = self._load_user_inputs()
         self.openai_api_keys = self._get_openai_keys()
+
+    def _get_index_name_by_language(self, lang_type: str) -> str:
+        """언어 타입에 따른 인덱스 이름 반환"""
+        if lang_type == "ko":
+            # 한국어 Dense 인덱스 우선 사용
+            if hasattr(settings, 'INDEX_NAME_KOR_DEN_CONTENTS') and settings.INDEX_NAME_KOR_DEN_CONTENTS:
+                return settings.INDEX_NAME_KOR_DEN_CONTENTS
+            elif hasattr(settings, 'INDEX_NAME_KOR_SPA_CONTENTS') and settings.INDEX_NAME_KOR_SPA_CONTENTS:
+                return settings.INDEX_NAME_KOR_SPA_CONTENTS
+        elif lang_type == "en":
+            # 영어 Dense 인덱스 우선 사용
+            if hasattr(settings, 'INDEX_NAME_ENG_DEN_CONTENTS') and settings.INDEX_NAME_ENG_DEN_CONTENTS:
+                return settings.INDEX_NAME_ENG_DEN_CONTENTS
+            elif hasattr(settings, 'INDEX_NAME_ENG_SPA_CONTENTS') and settings.INDEX_NAME_ENG_SPA_CONTENTS:
+                return settings.INDEX_NAME_ENG_SPA_CONTENTS
+        
+        # 기본값으로 설정의 INDEX_NAME 사용
+        if hasattr(settings, 'INDEX_NAME') and settings.INDEX_NAME:
+            return settings.INDEX_NAME
+        
+        # 모든 경우가 실패하면 기본값 반환
+        return f"default-index-{lang_type}"
 
     def _validate_test_data_files(self):
         """테스트 데이터 파일 존재 확인"""
@@ -118,20 +146,22 @@ class TestGradingSystem:
         
         try:
             config = GradingConfig(
-                document_id=self.test_document_id,
+                space_id=self.test_space_id,
                 index_name=self.test_index_name,
                 prompt_template="Test prompt with {reference_text} and {user_text}",
                 openai_api_keys=self.openai_api_keys,
                 model_name="gpt-4.1-mini",
                 temperature=0.0,
-                max_tokens=1000
+                max_tokens=1000,
+                lang_type=self.lang_type
             )
             
-            assert config.document_id == self.test_document_id
+            assert config.space_id == self.test_space_id
             assert config.index_name == self.test_index_name
             assert config.model_name == "gpt-4.1-mini"
             assert config.temperature == 0.0
             assert config.max_tokens == 1000
+            assert config.lang_type == self.lang_type
             assert len(config.openai_api_keys) == len(self.openai_api_keys)
             
             logger.info("GradingConfig test PASSED")
@@ -188,10 +218,11 @@ class TestGradingSystem:
         
         try:
             config = GradingConfig(
-                document_id=self.test_document_id,
+                space_id=self.test_space_id,
                 index_name=self.test_index_name,
                 prompt_template="Test prompt",
-                openai_api_keys=self.openai_api_keys
+                openai_api_keys=self.openai_api_keys,
+                lang_type=self.lang_type
             )
             
             nodes = GradingNodes(config)
@@ -217,10 +248,11 @@ class TestGradingSystem:
         
         try:
             config = GradingConfig(
-                document_id=self.test_document_id,
+                space_id=self.test_space_id,
                 index_name=self.test_index_name,
                 prompt_template="Test prompt",
-                openai_api_keys=self.openai_api_keys
+                openai_api_keys=self.openai_api_keys,
+                lang_type=self.lang_type
             )
             
             workflow = CorrectionWorkflow(config)
@@ -248,12 +280,13 @@ class TestGradingSystem:
         
         try:
             grading_service = GradingService(
-                document_id=self.test_document_id,
+                space_id=self.test_space_id,
                 index_name=self.test_index_name,
                 openai_api_keys=self.openai_api_keys,
                 model_name="gpt-4.1-mini",
                 temperature=0.0,
-                max_tokens=1000
+                max_tokens=1000,
+                lang_type=self.lang_type
             )
             
             assert hasattr(grading_service, 'config')
@@ -263,9 +296,10 @@ class TestGradingSystem:
             assert hasattr(grading_service, 'extract_wrong_ids')
             
             # 설정 확인
-            assert grading_service.config.document_id == self.test_document_id
+            assert grading_service.config.space_id == self.test_space_id
             assert grading_service.config.index_name == self.test_index_name
             assert grading_service.config.model_name == "gpt-4.1-mini"
+            assert grading_service.config.lang_type == self.lang_type
             
             logger.info("GradingService initialization test PASSED")
             return grading_service
@@ -322,14 +356,16 @@ class TestGradingSystem:
         
         try:
             grading_service = GradingService(
-                document_id=self.test_document_id,
+                space_id=self.test_space_id,
                 index_name=self.test_index_name,
                 openai_api_keys=self.openai_api_keys,
-                model_name="gpt-4.1-mini"
+                model_name="gpt-4.1-mini",
+                lang_type=self.lang_type
             )
             
-            logger.info(f"GradingService created with document_id: {self.test_document_id}")
+            logger.info(f"GradingService created with space_id: {self.test_space_id}")
             logger.info(f"Index name: {self.test_index_name}")
+            logger.info(f"Language type: {self.lang_type}")
             logger.info(f"User inputs length: {len(self.user_inputs)} characters")
             
             # 워크플로우 구조 확인
@@ -350,14 +386,16 @@ class TestGradingSystem:
         
         try:
             grading_service = GradingService(
-                document_id=self.test_document_id,
+                space_id=self.test_space_id,
                 index_name=self.test_index_name,
-                openai_api_keys=self.openai_api_keys
+                openai_api_keys=self.openai_api_keys,
+                lang_type=self.lang_type
             )
             
             logger.info("Starting full grading workflow test")
-            logger.info(f"Document ID: {self.test_document_id}")
+            logger.info(f"Space ID: {self.test_space_id}")
             logger.info(f"Index Name: {self.test_index_name}")
+            logger.info(f"Language Type: {self.lang_type}")
             
             start_time = datetime.now()
             
@@ -407,8 +445,9 @@ class TestGradingSystem:
         """모든 테스트 실행"""
         logger.info(f"Grading System Test: {self.test_id}")
         logger.info("=" * 50)
-        logger.info(f"Document ID: {self.test_document_id}")
+        logger.info(f"Space ID: {self.test_space_id}")
         logger.info(f"Index Name: {self.test_index_name}")
+        logger.info(f"Language Type: {self.lang_type}")  # 언어 타입 로깅 추가
         
         total_start_time = datetime.now()
         test_results = {}
@@ -513,11 +552,24 @@ async def check_environment():
         logger.error("PINECONE_API_KEY not configured")
         return False
     
+    # 언어별 인덱스 이름 확인
+    index_configs = [
+        ("INDEX_NAME_KOR_DEN_CONTENTS", "Korean Dense"),
+        ("INDEX_NAME_KOR_SPA_CONTENTS", "Korean Sparse"),
+        ("INDEX_NAME_ENG_DEN_CONTENTS", "English Dense"),
+        ("INDEX_NAME_ENG_SPA_CONTENTS", "English Sparse")
+    ]
+    
+    for index_attr, index_desc in index_configs:
+        if hasattr(settings, index_attr) and getattr(settings, index_attr):
+            logger.info(f"{index_desc} Index ({index_attr}): {getattr(settings, index_attr)}")
+        else:
+            logger.error(f"{index_desc} Index ({index_attr}) not configured")
+            return False
+    
+    # 기존 INDEX_NAME 확인 (하위 호환성)
     if hasattr(settings, 'INDEX_NAME') and settings.INDEX_NAME:
-        logger.info(f"INDEX_NAME: {settings.INDEX_NAME}")
-    else:
-        logger.error("INDEX_NAME not configured")
-        return False
+        logger.info(f"Legacy INDEX_NAME: {settings.INDEX_NAME}")
     
     # OpenAI 키 확인
     openai_keys = []
@@ -542,43 +594,57 @@ async def main():
     environment_ok = await check_environment()
     
     if not environment_ok:
-        logger.error("Environment check failed. Some tests may not work properly.")
-        logger.info("Continuing with available configuration...")
+        logger.error("Environment check failed. Some tests may not work properly")
+        logger.info("Continuing with available configuration")
     
-    test_document_id = "5481b11f-ea69-4314-a922-2d1b99ce3c9d"
-    logger.info(f"Using test document_id: {test_document_id}")
+    test_space_id = "6836e430e72c844ede76e9f5"
+    logger.info(f"Using test space_id: {test_space_id}")
 
-    # 테스트 실행
-    try:
-        test_service = TestGradingSystem(test_document_id=test_document_id)
-        result = await test_service.run_all_tests()
+    # 한국어와 영어 테스트 모두 실행
+    languages_to_test = [
+        {"lang": "ko", "name": "Korean"},
+        {"lang": "en", "name": "English"}
+    ]
+    
+    for lang_config in languages_to_test:
+        lang_type = lang_config["lang"]
+        lang_name = lang_config["name"]
         
-        # 최종 결과 출력
         logger.info("="*60)
-        logger.info("FINAL TEST RESULTS")
+        logger.info(f"Testing {lang_name} Language ({lang_type})")
         logger.info("="*60)
-        logger.info(f"Status: {result['status'].upper()}")
-        
-        if result['status'] in ['success', 'partial']:
-            logger.info(f"Test completed in {result['total_time']:.2f} seconds")
-            logger.info(f"Tests passed: {result['passed_count']}/{result['total_count']}")
+
+        # 테스트 실행
+        try:
+            test_service = TestGradingSystem(
+                test_space_id=test_space_id, 
+                lang_type=lang_type
+            )
+            result = await test_service.run_all_tests()
             
-            # 개별 테스트 결과 출력
-            logger.info("\nIndividual test results:")
+            # 언어별 결과 출력
+            logger.info("="*60)
+            logger.info(f"{lang_name.upper()} TEST RESULTS")
+            logger.info("="*60)
+            logger.info(f"Status: {result['status'].upper()}")
             
-            if result.get('wrong_answers_count', 0) > 0:
-                logger.info(f"Successfully detected {result['wrong_answers_count']} wrong answers")
-            
-            if result.get('status') == 'partial':
-                logger.warning("Some tests failed - check logs above for details")
-        else:
-            logger.error(f"Test execution failed: {result.get('error', 'Unknown error')}")
+            if result['status'] in ['success', 'partial']:
+                logger.info(f"Test completed in {result['total_time']:.2f} seconds")
+                logger.info(f"Tests passed: {result['passed_count']}/{result['total_count']}")
                 
-    except FileNotFoundError as e:
-        logger.error(f"File not found error: {str(e)}")
-        logger.error("Test data files will be created automatically.")
-    except Exception as e:
-        logger.error(f"Test execution failed: {str(e)}")
+                if result.get('wrong_answers_count', 0) > 0:
+                    logger.info(f"Successfully detected {result['wrong_answers_count']} wrong answers")
+                
+                if result.get('status') == 'partial':
+                    logger.warning("Some tests failed - check logs above for details")
+            else:
+                logger.error(f"Test execution failed: {result.get('error', 'Unknown error')}")
+                    
+        except FileNotFoundError as e:
+            logger.error(f"File not found error for {lang_name}: {str(e)}")
+            logger.error("Test data files will be created automatically")
+        except Exception as e:
+            logger.error(f"Test execution failed for {lang_name}: {str(e)}")
 
 if __name__ == "__main__":
     asyncio.run(main())

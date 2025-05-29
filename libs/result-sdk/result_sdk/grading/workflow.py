@@ -1,3 +1,5 @@
+# workflow.py
+
 from typing import List
 from langgraph.graph import StateGraph, END
 
@@ -41,23 +43,22 @@ class CorrectionWorkflow:
     
     async def run_correction(
         self,
-        document_id: str,
-        index_name: str,
-        user_inputs: str
+        space_id: str,
+        user_inputs: str,
+        lang_type: str = "ko"
     ) -> EvaluationResponse:
         """채점 워크플로우 실행"""
         try:
             correction_graph = self.create_correction_graph()
             
             initial_state: GraphState = {
-                "document_id": document_id,
-                "index_name": index_name,
+                "space_id": space_id,
+                "lang_type": lang_type,
                 "user_inputs": user_inputs,
                 "prompt_template": "",
                 "all_texts": [],
                 "pages": {},
-                "bm25_encoder": None,
-                "embedder": None,
+                "document_finder": None,
                 "wrong_answers_by_page": {},
                 "page_results": [],
                 "final_results": [],

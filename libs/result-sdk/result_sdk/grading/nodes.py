@@ -1,4 +1,4 @@
-# grading/nodes.py
+# nodes.py
 
 import json
 import asyncio
@@ -59,10 +59,13 @@ class GradingNodes:
 
     def initialization_node(self, state: GraphState) -> GraphState:
         """초기화 노드"""
-        # BM25 인코더 초기화
-        bm25_encoder = BM25Encoder()
-        bm25_encoder.fit(state["all_texts"])
-        state["bm25_encoder"] = bm25_encoder
+        # DocumentFinder 초기화 (동적 언어 설정)
+        document_finder = DocumentFinder(language=state["lang_type"])
+        
+        # BM25 설정 (새로운 방식)
+        document_finder.setup_bm25(state["all_texts"])
+        
+        state["document_finder"] = document_finder
         
         return state
     
@@ -78,11 +81,10 @@ class GradingNodes:
             task = self._async_process_page(
                 page_number=page_number,
                 page_entries=page_entries,
-                document_id=state["document_id"],
-                index_name=state["index_name"],
+                space_id=state["space_id"],
                 prompt_template=state["prompt_template"],
-                embedder=None,  # get_embedding은 함수이므로 embedder 파라미터는 None으로 설정
-                bm25_encoder=state["bm25_encoder"]
+                document_finder=state["document_finder"],
+                lang_type=state["lang_type"]  # 언어 타입 전달
             )
             page_tasks.append(task)
         
@@ -122,14 +124,13 @@ class GradingNodes:
     async def _grade_entry(
             self,
             entry: Any,
-            document_id: str,
-            index_name: str,
+            space_id: str,
             prompt_template: str,
             page_number: int,
-            embedder: Any,
-            bm25_encoder: Any
+            document_finder: DocumentFinder,
+            lang_type: str
         ) -> Tuple[List[int], str, str]:
-            """개별 항목 채점 (원본 grade_entry 함수)"""
+            """개별 항목 채점"""
             key = entry[0]
             text = entry[1][0] if entry[1] else ""
             
@@ -137,20 +138,16 @@ class GradingNodes:
             if len(words) <= 1:
                 return key, None, None
             
-            # DocumentFinder 초기화 및 BM25 설정
-            document_finder = DocumentFinder()
-            document_finder.bm25_manager.encoder = bm25_encoder
-            
-            # 검색 설정
+            # 검색 설정 (space_id 사용)
             retrieval_config = RetrievalConfig(
-                document_id=document_id,
-                index_name=index_name
+                space_id=space_id
             )
             
-            # 참고 텍스트 검색
+            # 참고 텍스트 검색 (동적 언어 설정)
             correct_text = document_finder.find_reference_text(
                 query=text,
-                config=retrieval_config
+                config=retrieval_config,
+                language=lang_type  # 파라미터로 받은 언어 사용
             )
             
             if not correct_text:
@@ -203,25 +200,23 @@ class GradingNodes:
         self,
         page_number: int,
         page_entries: List,
-        document_id: str,
-        index_name: str,
+        space_id: str,
         prompt_template: str,
-        embedder: Any,
-        bm25_encoder: Any
+        document_finder: DocumentFinder,
+        lang_type: str
     ) -> Tuple[int, List[WrongAnswer]]:
-        """페이지별 비동기 처리 (원본 async_process_page 함수)"""
+        """페이지별 비동기 처리"""
         logger.info(f"[페이지 {page_number}] 채점 중... (API 키 {1 if page_number % 2 == 1 else 2} 사용)")
         
         tasks = []
         for entry in page_entries:
             task = self._grade_entry(
                 entry=entry,
-                document_id=document_id,
-                index_name=index_name,
+                space_id=space_id,
                 prompt_template=prompt_template,
                 page_number=page_number,
-                embedder=embedder,
-                bm25_encoder=bm25_encoder
+                document_finder=document_finder,
+                lang_type=lang_type
             )
             tasks.append(task)
         
