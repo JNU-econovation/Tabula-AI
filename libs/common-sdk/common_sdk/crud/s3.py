@@ -92,8 +92,8 @@ class S3Storage:
             }
         """
         try:
-            # S3 경로 생성: image/origin/{userId}/{spaceId}/{resultId}/{id}.png
-            s3_key = f"image/origin/{user_id}/{space_id}/{result_id}/{page}.png"
+            # S3 경로 생성: images/origin/{userId}/{spaceId}/{resultId}/{id}.png
+            s3_key = f"images/origin/{user_id}/{space_id}/{result_id}/{page}.png"
             
             # 파일 업로드
             self.client.upload_file(
