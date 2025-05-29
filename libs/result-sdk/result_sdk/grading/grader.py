@@ -10,7 +10,6 @@ class GradingService:
 
     def __init__(self, 
         space_id: str, 
-        index_name: str,
         openai_api_keys: List[str] = None,
         model_name: str = "gpt-4.1-mini",
         temperature: float = 0,
@@ -27,7 +26,6 @@ class GradingService:
 
         self.config = GradingConfig(
             space_id=space_id,
-            index_name=index_name,
             prompt_template="",
             openai_api_keys=openai_api_keys,
             model_name=model_name,
@@ -39,26 +37,19 @@ class GradingService:
         self.workflow = CorrectionWorkflow(self.config)
 
     async def grade(self, user_inputs: str) -> EvaluationResponse:
-        """
-        채점 실행 (LangGraph 워크플로우)
-        """
+        """채점 실행 (LangGraph 워크플로우)"""
         return await self.workflow.run_correction(
             space_id=self.config.space_id,
-            index_name=self.config.index_name,
             user_inputs=user_inputs,
             lang_type=self.config.lang_type
         )
     
     async def grade_with_wrong_ids(self, user_inputs: str) -> Tuple[EvaluationResponse, List[List[int]]]:
-        """
-        채점 실행 후 오답 ID도 함께 반환
-        """
+        """채점 실행 후 오답 ID도 함께 반환 """
         evaluation_response = await self.grade(user_inputs)
         wrong_ids = extract_wrong_answer_ids(evaluation_response)
         return evaluation_response, wrong_ids
     
     def extract_wrong_ids(self, evaluation_response: EvaluationResponse) -> List[List[int]]:
-        """
-        채점 결과에서 오답 ID만 추출
-        """
+        """채점 결과에서 오답 ID만 추출"""
         return extract_wrong_answer_ids(evaluation_response)

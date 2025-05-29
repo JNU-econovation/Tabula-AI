@@ -40,20 +40,18 @@ class GradingResult(BaseModel):
 class GradingConfig(BaseModel):
     """채점 설정 모델"""
     space_id: str
-    index_name: str
     prompt_template: str
     openai_api_keys: List[str]
     model_name: str = "gpt-4.1-mini"
     temperature: float = 0
     max_tokens: int = 700
-    lang_type: str = "ko"  # 언어 타입 추가
+    lang_type: str = "ko"  # 언어 타입
 
 
 class GraphState(TypedDict):
     """그래프 상태 타입"""
     space_id: str
-    index_name: str
-    lang_type: str  # 언어 타입 추가
+    lang_type: str  # 언어 타입
     user_inputs: List[Any]
     prompt_template: str
     all_texts: List[str]

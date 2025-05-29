@@ -50,4 +50,4 @@ app.include_router(swagger_router, prefix="/api")  # /api/docs, /api/redoc
 
 # run server
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8001)
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)

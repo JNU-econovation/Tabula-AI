@@ -82,7 +82,6 @@ class GradingNodes:
                 page_number=page_number,
                 page_entries=page_entries,
                 space_id=state["space_id"],
-                index_name=state["index_name"],
                 prompt_template=state["prompt_template"],
                 document_finder=state["document_finder"],
                 lang_type=state["lang_type"]  # 언어 타입 전달
@@ -126,11 +125,10 @@ class GradingNodes:
             self,
             entry: Any,
             space_id: str,
-            index_name: str,
             prompt_template: str,
             page_number: int,
             document_finder: DocumentFinder,
-            lang_type: str  # 언어 타입 파라미터 추가
+            lang_type: str
         ) -> Tuple[List[int], str, str]:
             """개별 항목 채점"""
             key = entry[0]
@@ -203,10 +201,9 @@ class GradingNodes:
         page_number: int,
         page_entries: List,
         space_id: str,
-        index_name: str,
         prompt_template: str,
         document_finder: DocumentFinder,
-        lang_type: str  # 언어 타입 파라미터 추가
+        lang_type: str
     ) -> Tuple[int, List[WrongAnswer]]:
         """페이지별 비동기 처리"""
         logger.info(f"[페이지 {page_number}] 채점 중... (API 키 {1 if page_number % 2 == 1 else 2} 사용)")
@@ -216,11 +213,10 @@ class GradingNodes:
             task = self._grade_entry(
                 entry=entry,
                 space_id=space_id,
-                index_name=index_name,
                 prompt_template=prompt_template,
                 page_number=page_number,
                 document_finder=document_finder,
-                lang_type=lang_type  # 언어 타입 전달
+                lang_type=lang_type
             )
             tasks.append(task)
         

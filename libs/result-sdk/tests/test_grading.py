@@ -153,7 +153,7 @@ class TestGradingSystem:
                 model_name="gpt-4.1-mini",
                 temperature=0.0,
                 max_tokens=1000,
-                lang_type=self.lang_type  # 테스트 인스턴스의 언어 타입 사용
+                lang_type=self.lang_type
             )
             
             assert config.space_id == self.test_space_id
@@ -161,7 +161,7 @@ class TestGradingSystem:
             assert config.model_name == "gpt-4.1-mini"
             assert config.temperature == 0.0
             assert config.max_tokens == 1000
-            assert config.lang_type == self.lang_type  # 동적 언어 타입 검증
+            assert config.lang_type == self.lang_type
             assert len(config.openai_api_keys) == len(self.openai_api_keys)
             
             logger.info("GradingConfig test PASSED")
@@ -222,7 +222,7 @@ class TestGradingSystem:
                 index_name=self.test_index_name,
                 prompt_template="Test prompt",
                 openai_api_keys=self.openai_api_keys,
-                lang_type=self.lang_type  # 테스트 인스턴스의 언어 타입 사용
+                lang_type=self.lang_type
             )
             
             nodes = GradingNodes(config)
@@ -252,7 +252,7 @@ class TestGradingSystem:
                 index_name=self.test_index_name,
                 prompt_template="Test prompt",
                 openai_api_keys=self.openai_api_keys,
-                lang_type=self.lang_type  # 테스트 인스턴스의 언어 타입 사용
+                lang_type=self.lang_type
             )
             
             workflow = CorrectionWorkflow(config)
@@ -286,7 +286,7 @@ class TestGradingSystem:
                 model_name="gpt-4.1-mini",
                 temperature=0.0,
                 max_tokens=1000,
-                lang_type=self.lang_type  # 테스트 인스턴스의 언어 타입 사용
+                lang_type=self.lang_type
             )
             
             assert hasattr(grading_service, 'config')
@@ -299,7 +299,7 @@ class TestGradingSystem:
             assert grading_service.config.space_id == self.test_space_id
             assert grading_service.config.index_name == self.test_index_name
             assert grading_service.config.model_name == "gpt-4.1-mini"
-            assert grading_service.config.lang_type == self.lang_type  # 동적 언어 타입 검증
+            assert grading_service.config.lang_type == self.lang_type
             
             logger.info("GradingService initialization test PASSED")
             return grading_service
@@ -360,12 +360,12 @@ class TestGradingSystem:
                 index_name=self.test_index_name,
                 openai_api_keys=self.openai_api_keys,
                 model_name="gpt-4.1-mini",
-                lang_type=self.lang_type  # 테스트 인스턴스의 언어 타입 사용
+                lang_type=self.lang_type
             )
             
             logger.info(f"GradingService created with space_id: {self.test_space_id}")
             logger.info(f"Index name: {self.test_index_name}")
-            logger.info(f"Language type: {self.lang_type}")  # 동적 언어 타입 로깅
+            logger.info(f"Language type: {self.lang_type}")
             logger.info(f"User inputs length: {len(self.user_inputs)} characters")
             
             # 워크플로우 구조 확인
@@ -389,13 +389,13 @@ class TestGradingSystem:
                 space_id=self.test_space_id,
                 index_name=self.test_index_name,
                 openai_api_keys=self.openai_api_keys,
-                lang_type=self.lang_type  # 테스트 인스턴스의 언어 타입 사용
+                lang_type=self.lang_type
             )
             
             logger.info("Starting full grading workflow test")
             logger.info(f"Space ID: {self.test_space_id}")
             logger.info(f"Index Name: {self.test_index_name}")
-            logger.info(f"Language Type: {self.lang_type}")  # 동적 언어 타입 로깅
+            logger.info(f"Language Type: {self.lang_type}")
             
             start_time = datetime.now()
             
@@ -594,8 +594,8 @@ async def main():
     environment_ok = await check_environment()
     
     if not environment_ok:
-        logger.error("Environment check failed. Some tests may not work properly.")
-        logger.info("Continuing with available configuration...")
+        logger.error("Environment check failed. Some tests may not work properly")
+        logger.info("Continuing with available configuration")
     
     test_space_id = "6836e430e72c844ede76e9f5"
     logger.info(f"Using test space_id: {test_space_id}")
@@ -618,7 +618,7 @@ async def main():
         try:
             test_service = TestGradingSystem(
                 test_space_id=test_space_id, 
-                lang_type=lang_type  # 이제 지원되는 파라미터
+                lang_type=lang_type
             )
             result = await test_service.run_all_tests()
             
@@ -642,7 +642,7 @@ async def main():
                     
         except FileNotFoundError as e:
             logger.error(f"File not found error for {lang_name}: {str(e)}")
-            logger.error("Test data files will be created automatically.")
+            logger.error("Test data files will be created automatically")
         except Exception as e:
             logger.error(f"Test execution failed for {lang_name}: {str(e)}")
 

@@ -44,7 +44,6 @@ class CorrectionWorkflow:
     async def run_correction(
         self,
         space_id: str,
-        index_name: str,
         user_inputs: str,
         lang_type: str = "ko"
     ) -> EvaluationResponse:
@@ -54,7 +53,6 @@ class CorrectionWorkflow:
             
             initial_state: GraphState = {
                 "space_id": space_id,
-                "index_name": index_name,
                 "lang_type": lang_type,
                 "user_inputs": user_inputs,
                 "prompt_template": "",
