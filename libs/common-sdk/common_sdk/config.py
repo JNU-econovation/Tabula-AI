@@ -3,13 +3,35 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 
-# 프로젝트 루트 디렉토리 경로 설정
-PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(__file__))))
-# common-sdk의 prompts 디렉토리 경로 설정
-COMMON_SDK_ROOT = os.path.dirname(os.path.dirname(__file__))
+# 1. 환경 구분
+env = os.getenv("ENV", "test")
 
-# common-sdk .env 파일 로드
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+env_file_mapping = {
+    "test": ".env.test",
+    "dev": ".env.dev",
+    "prod": ".env.prod"
+}
+
+# 2. COMMON_SDK_ROOT 설정: common_sdk 
+COMMON_SDK_ROOT = Path(__file__).resolve().parent
+
+# 3. .env 파일 로드
+env_file = env_file_mapping.get(env, ".env.test")
+env_path = COMMON_SDK_ROOT / env_file
+load_dotenv(env_path)
+
+# 4. 프로젝트 루트 설정
+env_project_root_mapping = {
+    "test": COMMON_SDK_ROOT.parent.parent.parent,
+    "dev": Path("/app"),
+    "prod": Path("/app")
+}
+"""
+test: Tabula-AI
+dev: app
+prod: app
+"""
+PROJECT_ROOT = env_project_root_mapping.get(env, COMMON_SDK_ROOT.parent.parent.parent)
 
 class Settings:
 
@@ -25,12 +47,19 @@ class Settings:
     OPENAI_API_KEY_K = os.getenv("OPENAI_API_KEY_K")
     OPENAI_API_KEY_B = os.getenv("OPENAI_API_KEY_B")
 
+    # Pinecone
+    PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+    INDEX_NAME_KOR_DEN_CONTENTS = os.getenv("INDEX_NAME_KOR_DEN_CONTENTS")
+    INDEX_NAME_ENG_DEN_CONTENTS = os.getenv("INDEX_NAME_ENG_DEN_CONTENTS")
+    INDEX_NAME_KOR_SPA_CONTENTS = os.getenv("INDEX_NAME_KOR_SPA_CONTENTS")
+    INDEX_NAME_ENG_SPA_CONTENTS = os.getenv("INDEX_NAME_ENG_SPA_CONTENTS")
+
     # MongoDB 
-    MONGO_HOST = os.getenv("MONGO_HOST", "localhost")
-    MONGO_PORT = int(os.getenv("MONGO_PORT", "27017"))
+    MONGO_HOST = os.getenv("MONGO_HOST")
+    MONGO_PORT = int(os.getenv("MONGO_PORT"))
     MONGO_USERNAME = os.getenv("MONGO_USERNAME")
     MONGO_PASSWORD = os.getenv("MONGO_PASSWORD")
-    MONGO_DATABASE = os.getenv("MONGO_DATABASE", "tabula")
+    MONGO_DATABASE = os.getenv("MONGO_DATABASE")
 
     @property
     def MONGO_URI(self) -> str:
@@ -48,7 +77,6 @@ class Settings:
     # Auth
     JWT_SECRET = os.getenv("JWT_SECRET")
     ALGORITHM = os.getenv("ALGORITHM")
-    TEST_TOKEN = os.getenv("TEST_TOKEN")
 
     # Path setting
     LOG_PATH = os.getenv("LOG_PATH", os.path.join(PROJECT_ROOT, "logs"))
@@ -61,7 +89,7 @@ class Settings:
     RESULT_SDK_LOG_PATH = Path(RESULT_SDK_LOG_PATH)
 
     # Prompt Base Path
-    PROMPT_BASE_PATH = os.getenv("PROMPT_BASE_PATH", os.path.join(COMMON_SDK_ROOT, "common_sdk", "prompts"))
+    PROMPT_BASE_PATH = os.getenv("PROMPT_BASE_PATH", os.path.join(COMMON_SDK_ROOT, "prompts"))
     PROMPT_BASE_PATH = Path(PROMPT_BASE_PATH)
 
 settings = Settings()

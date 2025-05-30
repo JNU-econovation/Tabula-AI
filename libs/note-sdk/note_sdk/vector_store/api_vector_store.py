@@ -9,7 +9,7 @@ from pinecone_text.sparse import BM25Encoder
 
 from common_sdk.exceptions import ExternalConnectionError
 from common_sdk.utils import get_embedding
-from note_sdk.config import settings
+from common_sdk.config import settings as common_settings
 from common_sdk.get_logger import get_logger
 
 # 로거 설정
@@ -24,7 +24,7 @@ class VectorLoader:
         self.space_id = space_id
         
         # Pinecone 클라이언트 초기화
-        self.pc = Pinecone(api_key=settings.PINECONE_API_KEY)
+        self.pc = Pinecone(api_key=common_settings.PINECONE_API_KEY)
         
         # 인덱스 초기화
         self.dense_index = self.init_dense_index()
@@ -49,7 +49,7 @@ class VectorLoader:
     def init_dense_index(self) -> Any:
         try:
             # 언어에 따른 인덱스 설정
-            index_name = settings.INDEX_NAME_KOR_DEN_CONTENTS if self.language == "ko" else settings.INDEX_NAME_ENG_DEN_CONTENTS
+            index_name = common_settings.INDEX_NAME_KOR_DEN_CONTENTS if self.language == "ko" else common_settings.INDEX_NAME_ENG_DEN_CONTENTS
             
             # 언어별 차원 설정
             dimension = 4096 if self.language == "ko" else 3072  # Upstage: 4096, OpenAI 3-large: 3072
@@ -68,7 +68,7 @@ class VectorLoader:
     def init_sparse_index(self) -> Any:
         try:
             # 언어에 따른 인덱스 설정
-            index_name = settings.INDEX_NAME_KOR_SPA_CONTENTS if self.language == "ko" else settings.INDEX_NAME_ENG_SPA_CONTENTS
+            index_name = common_settings.INDEX_NAME_KOR_SPA_CONTENTS if self.language == "ko" else common_settings.INDEX_NAME_ENG_SPA_CONTENTS
             
             # 인덱스 존재 확인
             if index_name not in self.pc.list_indexes().names():

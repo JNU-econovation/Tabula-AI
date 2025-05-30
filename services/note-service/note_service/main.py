@@ -43,7 +43,7 @@ async def health_check():
 register_exception_handlers(app)
 
 # routers
-app.include_router(note_router, prefix="/v1/spaces")
+app.include_router(note_router, prefix="/v1/ai/spaces")
 app.include_router(swagger_router, prefix="/api")  # /api/docs, /api/redoc
 
 # run server
