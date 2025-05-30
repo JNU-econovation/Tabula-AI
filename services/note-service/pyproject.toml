@@ -8,10 +8,12 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
-tabula-common-sdk = { path = "../../libs/common-sdk", develop = true }
-tabula-note-sdk = { path = "../../libs/note-sdk", develop = true }
+tabula-common-sdk = { path = "../../libs/common-sdk", develop = true, extras = ["all"] }
+tabula-note-sdk = { path = "../../libs/note-sdk", develop = true, extras = ["all"] }
+fastapi = "^0.115.12"
+uvicorn = "^0.34.2"
+python-multipart = "^0.0.20"
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
-

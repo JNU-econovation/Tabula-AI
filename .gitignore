@@ -1,8 +1,12 @@
 # Created by https://www.toptal.com/developers/gitignore/api/python,dotenv,jupyternotebooks
 # Edit at https://www.toptal.com/developers/gitignore?templates=python,dotenv,jupyternotebooks
 
+### macOS ###
+.DS_Store
+
 ### dotenv ###
 .env
+.env.*
 
 ### JupyterNotebooks ###
 # gitignore template for Jupyter Notebooks
@@ -187,3 +191,25 @@ poetry.toml
 pyrightconfig.json
 
 # End of https://www.toptal.com/developers/gitignore/api/python,dotenv,jupyternotebooks
+
+# image / markdown
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.tiff
+*.md
+*.pdf
+*.docx
+*.doc
+*.xls
+*.xlsx
+*.pptx
+*.ppt
+*.txt
+*.csv
+*.json
+
+# log
+*.log

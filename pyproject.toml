@@ -4,8 +4,9 @@ version = "1.0.0"
 description = "Tabula: A Blank Slate Learning Method Assistance Service"
 authors = ["Tabula <blankest2025@gmail.com>"] #authors 키는 문자열 형태로 작성해야하기에 변경 (변경전: poetry install 시 다음과 같은 오류 발생 -> The Poetry configuration is invalid:  - tool.poetry.authors[0] must be string)
 readme = "README.md"
-packages = [ ]
-package-mode = false #루트 디렉터리는 패키지로 취급 X (해당 옵션이 없을경우 poetry install --no-root 을 이용해 설치해야함)
+# packages = [ ]
+# 루트 디렉터리 패키지로 취급 x (해당 옵션 없을경우 poetry install --no-root 을 이용해 설치 필요)
+package-mode = false 
 
 
 [tool.poetry.dependencies]

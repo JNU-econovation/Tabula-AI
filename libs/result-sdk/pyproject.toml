@@ -8,6 +8,11 @@ packages = [
 
 [tool.poetry.dependencies]
 python = "^3.11"
+tabula-common-sdk = { path = "../../libs/common-sdk", develop = true }
+langgraph = "0.4.3"
+pinecone = "6.0.2"
+pinecone-text = "0.10.0"
+pymupdf = "^1.26.0"
 
 
 [build-system]
