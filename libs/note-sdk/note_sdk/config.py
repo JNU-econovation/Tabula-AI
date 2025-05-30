@@ -2,23 +2,27 @@ import os
 from dotenv import load_dotenv
 from pathlib import Path
 
-# 경로 설정: note-sdk
-NOTE_SDK_ROOT = os.path.dirname(__file__)
+# 1. 환경 구분
+env = os.getenv("ENV", "test")
 
-# note-sdk의 .env 파일 로드
-load_dotenv(os.path.join(os.path.dirname(__file__), '.env'))
+# 2. NOTE_SDK_ROOT 설정: note_sdk
+NOTE_SDK_ROOT = Path(__file__).resolve().parent
+
+# 3. 프로젝트 루트 설정
+env_project_root_mapping = {
+    "test": NOTE_SDK_ROOT.parent.parent.parent,
+    "dev": Path("/app"),
+    "prod": Path("/app")
+}
+PROJECT_ROOT = env_project_root_mapping.get(env, NOTE_SDK_ROOT.parent.parent.parent)
 
 class Settings:
 
-    # Pinecone
-    PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
-    INDEX_NAME_KOR_DEN_CONTENTS = os.getenv("INDEX_NAME_KOR_DEN_CONTENTS")
-    INDEX_NAME_ENG_DEN_CONTENTS = os.getenv("INDEX_NAME_ENG_DEN_CONTENTS")
-    INDEX_NAME_KOR_SPA_CONTENTS = os.getenv("INDEX_NAME_KOR_SPA_CONTENTS")
-    INDEX_NAME_ENG_SPA_CONTENTS = os.getenv("INDEX_NAME_ENG_SPA_CONTENTS")
-
     # 기본 설정
-    SPACE_DIR = os.path.join(NOTE_SDK_ROOT, "space")
+    if env == "test":
+        SPACE_DIR = os.path.join(NOTE_SDK_ROOT, "space")
+    else:
+        SPACE_DIR = os.path.join(PROJECT_ROOT, "space")
 
     # 작업 디렉토리 구조
     @staticmethod

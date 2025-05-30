@@ -77,24 +77,13 @@ async def progress_generator(space_id: str, service: Any = None):
                 else:
                     # 진행 중인 경우
                     status_message = status.get("status", "처리 중")
-                    if progress <= ProgressRange.PDF_PARSING[1]:
-                        phase = ProgressPhase.PDF_PARSING
-                    elif progress <= ProgressRange.MARKDOWN_PROCESSING[1]:
-                        phase = ProgressPhase.MARKDOWN_PROCESSING
-                    elif progress <= ProgressRange.KEYWORD_GENERATION[1]:
-                        phase = ProgressPhase.KEYWORD_GENERATION
-                    else:
-                        phase = ProgressPhase.DB_STORAGE
-                    
                     yield {
                         "event": "progress",
                         "data": json.dumps({
                             "success": True,
                             "response": {
                                 "progress": progress,
-                                "phase": phase,
-                                "status": status_message,
-                                "spaceId": result.get("spaceId")
+                                "status": status_message
                             },
                             "error": None
                         })
