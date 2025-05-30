@@ -44,7 +44,7 @@ register_exception_handlers(app)
 
 # routers
 app.include_router(note_router, prefix="/v1/ai/spaces")
-app.include_router(swagger_router, prefix="/api")  # /api/docs, /api/redoc
+app.include_router(swagger_router, prefix="/v1/ai/spaces/api")  # /v1/ai/api/docs, /v1/ai/api/redoc
 
 # run server
 if __name__ == "__main__":
