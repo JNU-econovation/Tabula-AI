@@ -1,6 +1,6 @@
 from bson import ObjectId
 from typing import Dict, Any
-from fastapi import APIRouter, UploadFile, Form, BackgroundTasks, Depends, File
+from fastapi import APIRouter, UploadFile, Form, Depends, File
 
 from note_service.service import NoteService
 from common_sdk.sse import get_progress_stream
