@@ -164,26 +164,50 @@ class ResultFileUploadPageExceeded(HTTPException):
 1. 요청 데이터 누락
 2. 리소스 미존재
 """
-# 요청 데이터(taskId) 누락
+# 요청 데이터(spaceId) 누락
 class MissingSpaceId(HTTPException):
     def __init__(self):
         super().__init__(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "code": "SPACE_400_2", 
-                "reason": "Request-Header에 taskId가 누락되었습니다.", 
+                "reason": "Request-Header에 spaceId가 누락되었습니다.", 
                 "http_status": status.HTTP_400_BAD_REQUEST
             }
         )
 
-# 리소스 미존재
+# 리소스 미존재 (spaceId)
 class SpaceIdNotFound(HTTPException):
     def __init__(self):
         super().__init__(
             status_code=status.HTTP_404_NOT_FOUND,
             detail={
                 "code": "SPACE_404_1", 
-                "reason": "요청 데이터(taskId)에 해당하는 리소스가 존재하지 않습니다.", 
+                "reason": "요청 데이터(spaceId)에 해당하는 리소스가 존재하지 않습니다.", 
+                "http_status": status.HTTP_404_NOT_FOUND
+            }
+        )
+
+# 요청 데이터(resultId) 누락
+class MissingResultId(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail={
+                "code": "RESULT_400_1", 
+                "reason": "Request-Parameter에 resultId가 누락되었습니다.", 
+                "http_status": status.HTTP_400_BAD_REQUEST
+            }
+        )
+
+# 리소스 미존재 (resultId)
+class ResultIdNotFound(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail={
+                "code": "RESULT_404_1", 
+                "reason": "요청 데이터(resultId)에 해당하는 리소스가 존재하지 않습니다.", 
                 "http_status": status.HTTP_404_NOT_FOUND
             }
         )
