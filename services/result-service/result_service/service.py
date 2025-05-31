@@ -1,6 +1,6 @@
-from typing import Dict, Any, Optional, List
+# result_service/service.py
+from typing import Dict, Any, List
 from pathlib import Path
-import os
 import fitz
 import asyncio
 import json
@@ -9,6 +9,7 @@ import shutil
 from common_sdk import get_logger
 from common_sdk.crud.s3 import S3Storage
 from common_sdk.crud.mongodb import MongoDB
+from common_sdk.sse import update_progress
 from result_sdk.grading import GradingService
 from result_sdk.missing import MissingAnalyzer
 from result_sdk.config import settings
@@ -44,49 +45,221 @@ class ResultService:
         self.keyword_data: List[Dict] = []
     
     async def process_grading(self) -> Dict[str, Any]:
-        """메인 처리 로직"""
+        """메인 처리 로직 (SSE 적용)"""
         try:
-            # 1. PDF → PNG 분리 (PDF인 경우)
+            logger.info(f"Result: {self.result_id} - Starting grading process")
+            
+            # 1. PDF → PNG 분리 (0% - 10%)
             await self.convert_pdf_to_png()
             
-            # 2. S3에 원본 저장
+            update_progress(self.result_id, 10, {
+                "status": "파일 처리 완료",
+                "result": {"resultId": self.result_id}
+            })
+            await asyncio.sleep(0.5)
+            
+            # 2. S3에 원본 저장 (10% - 20%)
             await self.upload_origin_files()
             
-            # 3. OCR + LLM 처리
+            update_progress(self.result_id, 20, {
+                "status": "원본 파일 업로드 완료",
+                "result": {"resultId": self.result_id}
+            })
+            await asyncio.sleep(0.5)
+            
+            # 3. OCR + LLM 처리 (20% - 30%)
             await self.process_ocr_and_llm()
             
-            # 4. MongoDB에서 lang_type 조회
+            update_progress(self.result_id, 30, {
+                "status": "OCR 및 LLM 처리 완료",
+                "result": {"resultId": self.result_id}
+            })
+            await asyncio.sleep(0.5)
+            
+            # 4. MongoDB에서 lang_type 조회 (30% - 40%)
             lang_type = await self.get_language_type()
             
-            # 5. MongoDB에서 키워드 데이터 조회
+            update_progress(self.result_id, 40, {
+                "status": "언어 타입 조회 완료",
+                "result": {"resultId": self.result_id}
+            })
+            await asyncio.sleep(0.5)
+            
+            # 5. MongoDB에서 키워드 데이터 조회 (40% - 50%)
             await self.get_keyword_data()
             
-            # 6. 오답 채점과 누락 판단을 병렬로 처리
+            update_progress(self.result_id, 50, {
+                "status": "사전 데이터 조회 완료",
+                "result": {"resultId": self.result_id}
+            })
+            await asyncio.sleep(0.5)
+            
+            # 6. 오답 채점과 누락 판단을 병렬로 처리 (50% - 70%)
             await asyncio.gather(
                 self.grade_wrong_answers(lang_type),
                 self.detect_missing_answers()
             )
             
-            # 7. 오답 하이라이트 이미지 생성
+            update_progress(self.result_id, 70, {
+                "status": "채점 및 누락 분석 완료",
+                "result": {"resultId": self.result_id}
+            })
+            await asyncio.sleep(0.5)
+            
+            # 7. 오답 하이라이트 이미지 생성 (70% - 80%)
             await self.generate_highlight_images()
             
-            # 8. 하이라이트 이미지 S3 저장
+            update_progress(self.result_id, 80, {
+                "status": "하이라이트 이미지 생성 완료",
+                "result": {"resultId": self.result_id}
+            })
+            await asyncio.sleep(0.5)
+            
+            # 8. 하이라이트 이미지 S3 저장 (80% - 90%)
             await self.upload_highlight_images()
             
-            # 9. post_image_url 업데이트 (하이라이트 업로드 완료 후)
+            # 9. post_image_url 업데이트
             self.update_post_image_urls()
             
-            # 10. MongoDB에 결과 저장
+            update_progress(self.result_id, 90, {
+                "status": "하이라이트 이미지 업로드 완료",
+                "result": {"resultId": self.result_id}
+            })
+            await asyncio.sleep(0.5)
+            
+            # 10. MongoDB에 결과 저장 (90% - 100%)
             await self.save_results_to_db()
             
             # 11. 임시 파일 정리
             self.cleanup_temp_files()
             
-            # 12. 최종 응답 데이터 반환
-            return self.build_response()
+            # 12. 최종 완료 (100%)
+            response_data = self.build_response()
+            update_progress(self.result_id, 100, {
+                "status": "채점 처리 완료",
+                "result": {
+                    "resultId": self.result_id,
+                    "fileName": self.file_name
+                }
+            })
+            
+            logger.info(f"Result: {self.result_id} - Grading process completed successfully")
+            return response_data
+            
+            update_progress(self.result_id, 10, {
+                "status": "파일 처리 완료",
+                "result": {"resultId": self.result_id}
+            })
+            
+            # 2. S3에 원본 저장 (10% - 20%)
+            update_progress(self.result_id, 10, {
+                "status": "원본 파일 업로드 중",
+                "result": {"resultId": self.result_id}
+            })
+            await self.upload_origin_files()
+            
+            update_progress(self.result_id, 20, {
+                "status": "원본 파일 업로드 완료",
+                "result": {"resultId": self.result_id}
+            })
+            
+            # 3. OCR + LLM 처리 (20% - 40%)
+            update_progress(self.result_id, 20, {
+                "status": "OCR 및 LLM 처리 시작",
+                "result": {"resultId": self.result_id}
+            })
+            await self.process_ocr_and_llm()
+            
+            update_progress(self.result_id, 40, {
+                "status": "OCR 및 LLM 처리 완료",
+                "result": {"resultId": self.result_id}
+            })
+            
+            # 4. MongoDB에서 lang_type 조회 (40% - 45%)
+            update_progress(self.result_id, 40, {
+                "status": "언어 타입 조회 중",
+                "result": {"resultId": self.result_id}
+            })
+            lang_type = await self.get_language_type()
+            
+            # 5. MongoDB에서 키워드 데이터 조회 (45% - 50%)
+            update_progress(self.result_id, 45, {
+                "status": "키워드 데이터 조회 중",
+                "result": {"resultId": self.result_id}
+            })
+            await self.get_keyword_data()
+            
+            update_progress(self.result_id, 50, {
+                "status": "사전 데이터 조회 완료",
+                "result": {"resultId": self.result_id}
+            })
+            
+            # 6. 오답 채점과 누락 판단을 병렬로 처리 (50% - 70%)
+            update_progress(self.result_id, 50, {
+                "status": "채점 및 누락 분석 시작",
+                "result": {"resultId": self.result_id}
+            })
+            await asyncio.gather(
+                self.grade_wrong_answers(lang_type),
+                self.detect_missing_answers()
+            )
+            
+            update_progress(self.result_id, 70, {
+                "status": "채점 및 누락 분석 완료",
+                "result": {"resultId": self.result_id}
+            })
+            
+            # 7. 오답 하이라이트 이미지 생성 (70% - 80%)
+            update_progress(self.result_id, 70, {
+                "status": "하이라이트 이미지 생성 중",
+                "result": {"resultId": self.result_id}
+            })
+            await self.generate_highlight_images()
+            
+            # 8. 하이라이트 이미지 S3 저장 (80% - 90%)
+            update_progress(self.result_id, 80, {
+                "status": "하이라이트 이미지 업로드 중",
+                "result": {"resultId": self.result_id}
+            })
+            await self.upload_highlight_images()
+            
+            # 9. post_image_url 업데이트
+            self.update_post_image_urls()
+            
+            # 10. MongoDB에 결과 저장 (90% - 95%)
+            update_progress(self.result_id, 90, {
+                "status": "결과 저장 중",
+                "result": {"resultId": self.result_id}
+            })
+            await self.save_results_to_db()
+            
+            # 11. 임시 파일 정리 (95% - 100%)
+            update_progress(self.result_id, 95, {
+                "status": "임시 파일 정리 중",
+                "result": {"resultId": self.result_id}
+            })
+            self.cleanup_temp_files()
+            
+            # 12. 최종 완료 (100%)
+            response_data = self.build_response()
+            update_progress(self.result_id, 100, {
+                "status": "채점 처리 완료",
+                "result": {
+                    "resultId": self.result_id,
+                    "fileName": self.file_name
+                }
+            })
+            
+            logger.info(f"Result: {self.result_id} - Grading process completed successfully")
+            return response_data
             
         except Exception as e:
-            logger.error(f"Grading process failed: {str(e)}")
+            logger.error(f"Result: {self.result_id} - Grading process failed: {str(e)}")
+            # 에러 발생 시 진행률 -1로 설정
+            update_progress(self.result_id, -1, {
+                "status": f"처리 중 오류 발생: {str(e)}",
+                "result": {"resultId": self.result_id}
+            })
             # 에러 발생 시에도 임시 파일 정리
             self.cleanup_temp_files()
             raise
@@ -556,8 +729,7 @@ class ResultService:
         return {
             "success": True,
             "response": {
-                "resultId": self.result_id,
-                "fileName": self.file_name
+                "resultId": self.result_id
             },
             "error": None
         }

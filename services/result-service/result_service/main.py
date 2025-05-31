@@ -45,8 +45,8 @@ async def health_check():
 register_exception_handlers(app)
 
 # routers
-app.include_router(result_router, prefix="/v1/ai/spaces")
-app.include_router(swagger_router, prefix="/api")  # /api/docs, /api/redoc
+app.include_router(result_router, prefix="/v1/ai/results")
+app.include_router(swagger_router, prefix="/v1/ai/results/api")  # /api/docs, /api/redoc
 
 # run server
 if __name__ == "__main__":
