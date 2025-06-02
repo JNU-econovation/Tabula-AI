@@ -1,0 +1,44 @@
+# Python 3.11 이미지 사용
+FROM --platform=linux/amd64 python:3.11-slim
+
+# 작업 디렉토리 설정
+WORKDIR /app
+
+# Poetry 설치 및 설정
+RUN pip install --no-cache-dir poetry \
+ && poetry config virtualenvs.create false
+
+# SDK 패키지 복사
+COPY libs/common-sdk ./libs/common-sdk
+COPY libs/result-sdk ./libs/result-sdk
+
+# WORKDIR 변경
+WORKDIR /app/services/result-service
+
+# 의존성 정의 파일 복사
+COPY services/result-service/pyproject.toml services/result-service/poetry.lock ./
+
+# 서비스 파일 복사
+COPY services/result-service/result_service ./result_service
+
+# 의존성 설치
+RUN poetry install --no-root
+
+# 프로젝트 루트로 이동
+WORKDIR /app
+
+# 환경 변수 설정
+ENV PYTHONPATH=/app/services/result-service:/app \
+    ENV=dev \
+    SERVICE_DIR=/app/services/result-service/result_service
+
+# 타임존 설정 (Asia/Seoul)
+RUN ln -sf /usr/share/zoneinfo/Asia/Seoul /etc/localtime && \
+    echo "Asia/Seoul" > /etc/timezone
+
+# 포트 및 실행 위치 설정
+EXPOSE 8001
+WORKDIR ${SERVICE_DIR}
+
+# 서비스 실행
+CMD ["poetry", "run", "uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
