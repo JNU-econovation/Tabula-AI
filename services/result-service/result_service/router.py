@@ -137,7 +137,7 @@ async def upload_result(
         if result_id:
             update_result_progress(result_id, -1, {
                 "status": f"에러 발생: {str(e)}",
-                "result": {"spaceId": result_id}
+                "result": {"resultId": result_id}
             })
         raise
 
