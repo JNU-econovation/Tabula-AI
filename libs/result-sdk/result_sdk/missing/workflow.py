@@ -1,3 +1,4 @@
+# missing/workflow.py
 from typing import Dict, Any, List, Optional
 from typing_extensions import TypedDict
 from langgraph.graph import StateGraph, START, END
@@ -15,7 +16,7 @@ class MissingAnalysisState(TypedDict):
     raw_user_inputs: str  # 사용자 입력 원본
     
     # MongoDB 조회 데이터
-    keyword_data: Optional[List[Dict[str, Any]]]  # MongoDB에서 조회한 키워드 데이터
+    keyword_data: Optional[Dict[str, Any]]  # MongoDB에서 조회한 키워드 데이터 (딕셔너리 형태로 변경)
     
     # 처리된 데이터
     formatted_hierarchy: Optional[str]  # 키워드 계층화 형식
@@ -85,5 +86,3 @@ class MissingAnalysisWorkflow:
             "missing_items": result["missing_items"],
             "api_response": result.get("api_response")
         }
-    
-    # 키워드 분석 결과 MongoDB 저장

@@ -117,7 +117,7 @@ class MongoDB:
             raise
 
     # 학습 공간 키워드 조회
-    async def get_space_keywords(self, space_id: str) -> List[Dict[str, Any]]:
+    async def get_space_keywords(self, space_id: str) -> Dict[str, Any]:
         """MongoDB에서 space_id를 통해 키워드 데이터 조회"""
         try:
             # space_id를 ObjectId로 변환
@@ -129,21 +129,37 @@ class MongoDB:
             
             if not document:
                 logger.warning(f"No document found for space_id: {space_id}")
-                return []
+                return None
             
             # keyword 필드 추출
-            keyword_data = document.get("keyword", [])
+            keyword_data = document.get("keyword")
             
-            if not isinstance(keyword_data, list):
-                logger.warning(f"keyword field is not a list for space_id: {space_id}")
-                return []
+            if not keyword_data:
+                logger.warning(f"keyword field is empty for space_id: {space_id}")
+                return None
+                
+            # 딕셔너리 형태 처리 (dev 구조)
+            if isinstance(keyword_data, dict):
+                logger.info(f"Retrieved keyword data (dict) for space_id: {space_id} - {keyword_data.get('name', 'Unknown')}")
+                return keyword_data
             
-            logger.info(f"Retrieved {len(keyword_data)} keyword items for space_id: {space_id}")
-            return keyword_data
+            # 기존 리스트 형태 처리 (하위 호환성)
+            elif isinstance(keyword_data, list):
+                if len(keyword_data) > 0:
+                    logger.info(f"Retrieved keyword data (list) for space_id: {space_id} - converting first item")
+                    return keyword_data[0]  # 첫 번째 요소 반환
+                else:
+                    logger.warning(f"keyword field is empty list for space_id: {space_id}")
+                    return None
+            
+            # 예상치 못한 형태
+            else:
+                logger.warning(f"keyword field is unexpected type ({type(keyword_data)}) for space_id: {space_id}")
+                return None
             
         except Exception as e:
             logger.error(f"Failed to fetch keyword data from MongoDB: {e}")
-            return []
+            return None
 
     # 학습 결과물 저장
     def create_result(self,

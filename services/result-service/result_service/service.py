@@ -39,7 +39,7 @@ class ResultService:
         self.wrong_answer_ids: List[List[int]] = []
         self.missing_answers: List[str] = []
         self.highlight_urls: List[str] = []
-        self.keyword_data: List[Dict] = []
+        self.keyword_data: Dict = None
         self.db_result_id: str = None
     
     async def process_grading(self) -> Dict[str, Any]:
@@ -498,19 +498,23 @@ class ResultService:
         try:
             logger.info(f"Result: {self.result_id} - Getting keyword data for space: {self.space_id}")
             
-            # MongoDB에서 해당 space_id의 키워드 데이터 조회 (비동기 메서드)
             keyword_data = await self.mongodb.get_space_keywords(self.space_id)
             
             if not keyword_data:
                 logger.warning(f"Result: {self.result_id} - No keyword data found for space: {self.space_id}")
-                self.keyword_data = []
+                self.keyword_data = None
             else:
                 self.keyword_data = keyword_data
-                logger.info(f"Result: {self.result_id} - Retrieved {len(self.keyword_data)} keyword items")
+
+                if isinstance(keyword_data, dict):
+                    children_count = len(keyword_data.get('children', []))
+                    logger.info(f"Result: {self.result_id} - Retrieved keyword data with {children_count} children")
+                else:
+                    logger.info(f"Result: {self.result_id} - Retrieved keyword data")
             
         except Exception as e:
             logger.error(f"Result: {self.result_id} - Error getting keyword data: {str(e)}")
-            self.keyword_data = []
+            self.keyword_data = None
 
     async def detect_missing_answers(self):
         """누락 답안 판단"""
