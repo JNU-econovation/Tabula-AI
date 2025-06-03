@@ -12,7 +12,7 @@ from common_sdk.auth import get_current_member
 from common_sdk.crud.s3 import S3Storage
 from common_sdk.crud.mongodb import MongoDB
 from common_sdk.swagger import result_service_response, result_service_space_response
-from common_sdk.sse import update_progress, get_progress_stream
+from common_sdk.sse import update_result_progress, get_result_progress_stream  # Result Service용 함수들 사용
 from common_sdk.exceptions import (
     MissingResultFileData, UnsupportedResultFileFormat,
     MissingResultId, ResultIdNotFound
@@ -65,10 +65,10 @@ async def upload_result(
         # result_id 생성
         result_id = str(ObjectId())
 
-        # 초기 상태 설정
-        update_progress(result_id, 0, {
-            "status": "파일 업로드 준비 중",
-            "result": {"resultId": result_id}
+        # 초기 상태 설정 (Result Service용 함수 사용)
+        update_result_progress(result_id, 0, "processing", {
+            "resultId": result_id,
+            "status": "processing"
         })
 
         # 임시 디렉토리 생성
@@ -118,9 +118,9 @@ async def upload_result(
         service_instances[result_id] = service
 
         # 업로드 완료 후 진행률 초기화 (SSE 연결 전 미리 설정)
-        update_progress(result_id, 0, {
-            "status": "파일 업로드 완료, 처리 대기 중",
-            "result": {"resultId": result_id}
+        update_result_progress(result_id, 0, "processing", {
+            "resultId": result_id,
+            "status": "processing"
         })
 
         response = {
@@ -133,21 +133,13 @@ async def upload_result(
 
         return response
     
-    except HTTPException:
-        if result_id:
-            update_progress(result_id, -1, {
-                "status": f"에러 발생",
-                "result": {"resultId": result_id}
-            })
-        raise
     except Exception as e:
-        logger.error(f"Space: {spaceId} - Error in upload_result: {str(e)}")
         if result_id:
-            update_progress(result_id, -1, {
+            update_result_progress(result_id, -1, {
                 "status": f"에러 발생: {str(e)}",
                 "result": {"resultId": result_id}
             })
-        raise HTTPException(status_code=500, detail=f"파일 업로드 중 오류가 발생했습니다: {str(e)}")
+        raise
 
 # 진행률 확인
 @router.get("/{spaceId}/progress/{resultId}", responses=result_service_space_response)
@@ -168,15 +160,13 @@ async def get_progress(
             logger.error(f"User: {user_id} - Result not found: {resultId}")
             raise ResultIdNotFound()
             
-        # SSE 연결 시작하면서 즉시 처리 시작
-        asyncio.create_task(service.process_grading())
-        
-        return get_progress_stream(resultId)
+        # SSE 연결 시작
+        return get_result_progress_stream(resultId, service)
         
     except Exception as e:
         logger.error(f"User: {user_id} - Error in get_progress: {str(e)}")
-        update_progress(resultId, -1, {
-            "status": f"진행률 조회 실패: {str(e)}",
-            "result": {"resultId": resultId}
+        update_result_progress(resultId, -1, "error", {
+            "resultId": resultId,
+            "error": f"진행률 조회 실패: {str(e)}"
         })
         raise

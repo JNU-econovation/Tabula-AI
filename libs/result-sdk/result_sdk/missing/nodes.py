@@ -1,3 +1,4 @@
+# missing/nodes.py
 import json
 from typing import Dict, Any, List
 from openai import OpenAI
@@ -54,14 +55,18 @@ class MissingAnalysisNodes:
             
             state["keyword_data"] = keyword_data
             
-            logger.info(f"Successfully loaded {len(keyword_data)} keywords from MongoDB")
+            if isinstance(keyword_data, dict):
+                children_count = len(keyword_data.get('children', []))
+                logger.info(f"Successfully loaded keyword data with {children_count} children from MongoDB")
+            else:
+                logger.info(f"Successfully loaded keyword data from MongoDB")
             return state
         
         except Exception as e:
             logger.error(f"Failed to load keywords from DB: {e}")
             state["error"] = str(e)
             return state
-    
+        
     async def formatting_keywords(self, state: Dict[str, Any]) -> Dict[str, Any]:
         """키워드 포맷팅 노드"""
         try:
@@ -74,11 +79,12 @@ class MissingAnalysisNodes:
             if not raw_inputs:
                 raise ValueError("user input does not exist")
             
-            # 첫 번째 키워드만 사용
-            if not isinstance(keyword_data, list) or len(keyword_data) == 0:
-                raise ValueError("Invalid keyword data format")
+            # 딕셔너리 형태로 변경 {"name": "한국사 지역사", "children": [...]}
+            if not isinstance(keyword_data, dict):
+                raise ValueError("Invalid keyword data format - expected dict")
             
-            main_keyword = keyword_data[0]
+            # 딕셔너리를 그대로 사용
+            main_keyword = keyword_data
             
             self.data_processor.set_keyword_data(main_keyword)
             self.data_processor.set_user_inputs(raw_inputs)

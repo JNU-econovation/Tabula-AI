@@ -9,6 +9,8 @@ from common_sdk.constants import ProgressPhase, ProgressRange, StatusMessage
 
 logger = get_logger()
 
+# Note Service
+
 # 진행률 저장소
 progress_store: Dict[str, Dict[str, Any]] = {}
 
@@ -104,3 +106,99 @@ async def progress_generator(space_id: str, service: Any = None):
 def get_progress_stream(space_id: str, service: Any = None):
     """진행률 스트림 반환"""
     return EventSourceResponse(progress_generator(space_id, service))
+
+# Result Service
+
+# 진행률 저장소
+result_progress_store: Dict[str, Dict[str, Any]] = {}
+
+def update_result_progress(result_id: str, progress: int, status: str = "processing", data: Dict[str, Any] = None):
+    """Result 전용 진행률 업데이트"""
+    if result_id not in result_progress_store:
+        result_progress_store[result_id] = {
+            "progress": 0,
+            "status": "processing",
+            "data": {}
+        }
+    
+    result_progress_store[result_id]["progress"] = progress
+    result_progress_store[result_id]["status"] = status
+    
+    if data:
+        result_progress_store[result_id]["data"] = data
+
+async def result_progress_generator(result_id: str, service: Any = None):
+    """Result Service SSE 진행률 생성기"""
+    try:
+        # 1. 초기 상태 확인
+        if result_id not in result_progress_store:
+            update_result_progress(result_id, 0, "processing")
+        
+        # 2. 처리 시작
+        if service:
+            # 비동기 처리 시작
+            asyncio.create_task(service.process_grading())
+        
+        # 3. SSE 연결 시작
+        while True:
+            if result_id in result_progress_store:
+                data = result_progress_store[result_id]
+                progress = data["progress"]
+                status = data["status"]
+                result_data = data.get("data", {})
+                
+                # 4. 진행 상태에 따른 이벤트 전송
+                if progress == 100:
+                    # Complete 응답 (API 명세 기준)
+                    yield {
+                        "event": "complete",
+                        "data": json.dumps({
+                            "success": True,
+                            "response": result_data,
+                            "error": None
+                        })
+                    }
+                    break
+                    
+                elif progress == -1:
+                    # Error 응답
+                    error_message = result_data.get("error", StatusMessage.ERROR)
+                    yield {
+                        "event": "error",
+                        "data": json.dumps({
+                            "success": False,
+                            "response": None,
+                            "error": error_message
+                        })
+                    }
+                    break
+                    
+                else:
+                    yield {
+                        "event": "progress",
+                        "data": json.dumps({
+                            "success": True,
+                            "response": {
+                                "progress": progress,
+                                "status": "processing"
+                            },
+                            "error": None
+                        })
+                    }
+            
+            await asyncio.sleep(0.1)
+            
+    except Exception as e:
+        logger.error(f"[result_progress_generator] SSE Error: {str(e)}")
+        yield {
+            "event": "error",
+            "data": json.dumps({
+                "success": False,
+                "response": None,
+                "error": f"SSE Error: {str(e)}"
+            })
+        }
+
+def get_result_progress_stream(result_id: str, service: Any = None):
+    """Result용 진행률 스트림 반환"""
+    return EventSourceResponse(result_progress_generator(result_id, service))
