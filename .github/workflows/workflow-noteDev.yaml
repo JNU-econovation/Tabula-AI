@@ -56,8 +56,8 @@ jobs:
           # 기존 AWS EC2 서버에서 수행한 명령어 작성
           script: |
             cd ai
-            sudo docker stop ${{ secrets.NOTE_DEV_APPLICATION }} || true
-            sudo docker rm ${{ secrets.NOTE_DEV_APPLICATION }} || true
+            sudo docker stop ${{ secrets.NOTE_DEV_APPLICATION }}
+            sudo docker rm ${{ secrets.NOTE_DEV_APPLICATION }}
             sudo docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.NOTE_DEV_APPLICATION }}:latest
-            sudo docker run -d -p 8000:8000 --name ${{ secrets.NOTE_DEV_APPLICATION }} --env-file .env -v ${{ secrets.GOOGLE_API_PATH }} ${{ secrets.DOCKER_USERNAME }}/${{ secrets.NOTE_DEV_APPLICATION }}:latest
+            sudo docker run -d -p 8000:8000 --name ${{ secrets.NOTE_DEV_APPLICATION }} --env-file .env.dev ${{ secrets.DOCKER_USERNAME }}/${{ secrets.NOTE_DEV_APPLICATION }}:latest
             sudo docker image prune -a -f
