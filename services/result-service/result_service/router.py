@@ -32,7 +32,7 @@ s3_storage = S3Storage()
 mongodb = MongoDB()
 
 # 지원하는 파일 형식
-ALLOWED_FILE_TYPES = ["application/pdf", "image/png"]
+ALLOWED_FILE_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/jpg"]
 MAX_PDF_PAGES = 6
 
 @router.post("/{spaceId}/result", responses=result_service_response)
@@ -49,7 +49,7 @@ async def upload_result(
     
     # 파일 개수 및 형식 검증
     if len(file) == 1:
-        # 단일 파일인 경우: PDF 또는 PNG 허용
+        # 단일 파일인 경우: PDF 또는 IMAGE 허용
         single_file = file[0]
         if single_file.content_type not in ALLOWED_FILE_TYPES:
             logger.error(f"User: {userId} - Unsupported file type: {single_file.content_type}")
@@ -57,8 +57,8 @@ async def upload_result(
     else:
         # 여러 파일인 경우: 모두 PNG여야 함
         for i, single_file in enumerate(file):
-            if single_file.content_type != "image/png":
-                logger.error(f"User: {userId} - Multiple files must be PNG. File {i+1}: {single_file.content_type}")
+            if single_file.content_type == "application/pdf":
+                logger.error(f"User: {userId} - Multiple files must be IMAGE. File {i+1}: {single_file.content_type}")
                 raise UnsupportedResultFileFormat()
     
     result_id = None
