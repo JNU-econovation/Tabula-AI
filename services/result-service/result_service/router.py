@@ -4,7 +4,7 @@ from fastapi import APIRouter, UploadFile, Depends, File, HTTPException
 from bson import ObjectId
 import tempfile
 from pathlib import Path
-import asyncio
+import fitz
 
 from result_service.service import ResultService
 from common_sdk import get_logger
@@ -15,7 +15,7 @@ from common_sdk.swagger import result_service_response, result_service_space_res
 from common_sdk.sse import update_result_progress, get_result_progress_stream  # Result Service용 함수들 사용
 from common_sdk.exceptions import (
     MissingResultFileData, UnsupportedResultFileFormat,
-    MissingResultId, ResultIdNotFound
+    MissingResultId, ResultIdNotFound, ResultFileUploadPageExceeded
 )
 
 
@@ -33,6 +33,7 @@ mongodb = MongoDB()
 
 # 지원하는 파일 형식
 ALLOWED_FILE_TYPES = ["application/pdf", "image/png"]
+MAX_PDF_PAGES = 6
 
 @router.post("/{spaceId}/result", responses=result_service_response)
 async def upload_result(
@@ -84,6 +85,10 @@ async def upload_result(
             
             # 파일 내용 읽기
             content = await single_file.read()
+
+            # PDF 파일인 경우 페이지 수 체크
+            if single_file.content_type == "application/pdf":
+                check_pdf_page_count(content, single_file.filename, userId)
             
             # 파일 저장
             if len(file) == 1:
@@ -170,3 +175,27 @@ async def get_progress(
             "error": f"진행률 조회 실패: {str(e)}"
         })
         raise
+
+def check_pdf_page_count(file_content: bytes, filename: str, user_id: int) -> None:
+    """PyMuPDF를 사용하여 PDF 파일의 페이지 수를 체크하는 함수"""
+    doc = None
+    try:
+        # PyMuPDF로 PDF 문서 열기
+        doc = fitz.open(stream=file_content, filetype="pdf")
+        page_count = len(doc)
+        
+        if page_count > MAX_PDF_PAGES:
+            logger.error(f"User: {user_id} - PDF page count exceeded: {filename} has {page_count} pages (max: {MAX_PDF_PAGES})")
+            raise ResultFileUploadPageExceeded()
+        
+        logger.info(f"User: {user_id} - PDF page count check passed: {filename} has {page_count} pages")
+        
+    except ResultFileUploadPageExceeded:
+        raise
+    except Exception as e:
+        logger.error(f"User: {user_id} - Error checking PDF page count for {filename}: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"PDF 파일 페이지 수 확인 중 오류가 발생했습니다: {str(e)}")
+    finally:
+        # 리소스 해제
+        if doc is not None:
+            doc.close()
