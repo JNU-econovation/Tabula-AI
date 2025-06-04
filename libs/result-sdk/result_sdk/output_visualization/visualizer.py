@@ -131,7 +131,7 @@ def draw_underlines_for_incorrect_answers_enhanced(
         print("\n밑줄이 그려진 이미지가 없습니다 (또는 처리 중 오류 발생).")
     print("--- '다음 ID 이전까지' 밑줄 그리기 작업 종료 ---")
 
-
+"""
 if __name__ == '__main__':
     print("="*50)
     print("visualizer.py 직접 실행 테스트")
@@ -206,3 +206,4 @@ if __name__ == '__main__':
     #     print(f"\n테스트 이미지 폴더 '{mock_image_folder}' 삭제 완료.")
 
     print("\n--- visualizer.py 직접 실행 테스트 종료 ---")
+"""
