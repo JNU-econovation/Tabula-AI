@@ -11,7 +11,7 @@ from result_sdk.config import settings
 logger = get_logger()
 
 class TestRetrievalSearch:
-    def __init__(self, test_space_id: str = "6836e430e72c844ede76e9f5", language: str = "ko"):
+    def __init__(self, test_space_id: str = "6836e430e72c844ede76e9f5", language: str = "korean"):
         """테스트 초기화"""
         
         self.test_data_dir = Path(__file__).parent / "data"
@@ -22,7 +22,7 @@ class TestRetrievalSearch:
         self.language = language
         
         # 언어에 따른 인덱스 이름 설정
-        if language == "ko":
+        if language == "korean":
             self.test_dense_index_name = settings.INDEX_NAME_KOR_DEN_CONTENTS
             self.test_sparse_index_name = settings.INDEX_NAME_KOR_SPA_CONTENTS
         else:
@@ -49,7 +49,7 @@ class TestRetrievalSearch:
             
         if not test_texts_file.exists():
             # 기본 테스트 텍스트 생성
-            if self.language == "ko":
+            if self.language == "korean":
                 default_texts = [
                     "이것은 첫 번째 테스트 문서입니다.",
                     "두 번째 문서는 검색 기능을 테스트합니다.",
@@ -69,7 +69,7 @@ class TestRetrievalSearch:
             
         if not test_queries_file.exists():
             # 기본 테스트 쿼리 생성
-            if self.language == "ko":
+            if self.language == "korean":
                 default_queries = [
                     "첫 번째 문서",
                     "검색 기능",
@@ -127,7 +127,7 @@ class TestRetrievalSearch:
                 return False
             
             # 언어별 인덱스 이름 확인
-            if self.language == "ko":
+            if self.language == "korean":
                 if not settings.INDEX_NAME_KOR_DEN_CONTENTS or not settings.INDEX_NAME_KOR_SPA_CONTENTS:
                     logger.error("Korean index names not configured")
                     return False
@@ -565,7 +565,7 @@ async def main():
         return
     
     test_space_id = "6836e430e72c844ede76e9f5"
-    language = "ko"  # 또는 "en"
+    language = "korean"  # 또는 "english"
     
     logger.info(f"Using test space_id: {test_space_id}")
     logger.info(f"Using language: {language}")
