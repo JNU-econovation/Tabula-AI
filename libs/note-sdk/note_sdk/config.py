@@ -24,6 +24,9 @@ class Settings:
     else:
         SPACE_DIR = os.path.join(PROJECT_ROOT, "space")
 
+    # 파일 최대 크기 설정
+    MAX_TOKEN = 100000
+
     # 작업 디렉토리 구조
     @staticmethod
     def get_space_dir(space_id: str) -> Path:

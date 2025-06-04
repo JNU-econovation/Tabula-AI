@@ -110,6 +110,19 @@ class NoteFileSizeExceeded(HTTPException):
             }
         )
 
+# 파일 내 존재하는 토큰 초과
+class TokenExceeded(HTTPException):
+    def __init__(self):
+        super().__init__(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail={
+                "code": "FILE_413_2", 
+                "reason": "파일(PDF)의 텍스트 토큰값 허용 범위 초과입니다.(허용 범위: 100,000 token)",
+                "http_status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
+            }
+        )
+
+
 # 학습 결과물 파일 데이터(PDF / Image) 누락
 class MissingResultFileData(HTTPException):
     def __init__(self):
@@ -117,7 +130,7 @@ class MissingResultFileData(HTTPException):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail={
                 "code": "FILE_400_3", 
-                "reason": "파일 데이터(PDF/Image) 누락입니다.", 
+                "reason": "파일 데이터(PDF/Image) 누락입니다.",
                 "http_status": status.HTTP_400_BAD_REQUEST
             }
         )
@@ -134,18 +147,6 @@ class UnsupportedResultFileFormat(HTTPException):
             }
         )
 
-# 학습 결과물 파일 용량 초과
-class ResultFileSizeExceeded(HTTPException):
-    def __init__(self):
-        super().__init__(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-            detail={
-                "code": "FILE_413_2", 
-                "reason": "파일(PDF / Image) 크기가 허용 범위 초과입니다.(허용 범위: 5MB)",
-                "http_status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
-            }
-        )
-
 # 학습 결과물 업로드 가능 페이지 초과
 class ResultFileUploadPageExceeded(HTTPException):
     def __init__(self):
@@ -153,7 +154,7 @@ class ResultFileUploadPageExceeded(HTTPException):
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={
                 "code": "FILE_413_3",
-                "reason": "파일(PDF / Image)입력 페이지가 허용 범위 초과입니다.(허용 범위: 6페이지)",
+                "reason": "파일(PDF) 입력 페이지가 허용 범위 초과입니다.(허용 범위: 6페이지)",
                 "http_status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
             }
         )
