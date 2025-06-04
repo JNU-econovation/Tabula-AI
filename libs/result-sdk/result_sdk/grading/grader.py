@@ -1,5 +1,3 @@
-# grader.py
-
 from typing import List, Tuple
 from .models import GradingConfig, EvaluationResponse
 from .workflow import CorrectionWorkflow, extract_wrong_answer_ids

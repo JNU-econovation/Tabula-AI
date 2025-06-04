@@ -1,5 +1,4 @@
-import json
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any
 
 from common_sdk import get_logger
 from .processor import DataProcessor
