@@ -5,7 +5,7 @@ from typing import Dict, Any
 from sse_starlette.sse import EventSourceResponse
 
 from common_sdk.get_logger import get_logger
-from common_sdk.constants import ProgressPhase, ProgressRange, StatusMessage
+from common_sdk.constants import StatusMessage
 
 logger = get_logger()
 
@@ -59,7 +59,6 @@ async def progress_generator(space_id: str, service: Any = None):
                             "success": True,
                             "response": {
                                 "progress": 100,
-                                "spaceId": result.get("spaceId"),
                                 "spaceName": result.get("spaceName"),
                             },
                             "error": None
@@ -78,14 +77,12 @@ async def progress_generator(space_id: str, service: Any = None):
                     break
                 else:
                     # 진행 중인 경우
-                    status_message = status.get("status", "처리 중")
                     yield {
                         "event": "progress",
                         "data": json.dumps({
                             "success": True,
                             "response": {
-                                "progress": progress,
-                                "status": status_message
+                                "progress": progress
                             },
                             "error": None
                         })

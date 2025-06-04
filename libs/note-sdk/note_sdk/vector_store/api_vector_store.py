@@ -18,7 +18,7 @@ logger = get_logger()
 
 # 벡터 로더 클래스
 class VectorLoader:
-    def __init__(self, language: Literal["ko", "en"], space_id: str = None):
+    def __init__(self, language: Literal["korean", "english"], space_id: str = None):
 
         self.language = language
         self.space_id = space_id
@@ -49,10 +49,10 @@ class VectorLoader:
     def init_dense_index(self) -> Any:
         try:
             # 언어에 따른 인덱스 설정
-            index_name = common_settings.INDEX_NAME_KOR_DEN_CONTENTS if self.language == "ko" else common_settings.INDEX_NAME_ENG_DEN_CONTENTS
+            index_name = common_settings.INDEX_NAME_KOR_DEN_CONTENTS if self.language == "korean" else common_settings.INDEX_NAME_ENG_DEN_CONTENTS
             
             # 언어별 차원 설정
-            dimension = 4096 if self.language == "ko" else 3072  # Upstage: 4096, OpenAI 3-large: 3072
+            dimension = 4096 if self.language == "korean" else 3072  # Upstage: 4096, OpenAI 3-large: 3072
             
             # 인덱스 존재 확인
             if index_name not in self.pc.list_indexes().names():
@@ -68,7 +68,7 @@ class VectorLoader:
     def init_sparse_index(self) -> Any:
         try:
             # 언어에 따른 인덱스 설정
-            index_name = common_settings.INDEX_NAME_KOR_SPA_CONTENTS if self.language == "ko" else common_settings.INDEX_NAME_ENG_SPA_CONTENTS
+            index_name = common_settings.INDEX_NAME_KOR_SPA_CONTENTS if self.language == "korean" else common_settings.INDEX_NAME_ENG_SPA_CONTENTS
             
             # 인덱스 존재 확인
             if index_name not in self.pc.list_indexes().names():
