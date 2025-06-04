@@ -1,5 +1,3 @@
-# search.py
-
 import json
 from typing import List, Optional, Dict, Any
 from pinecone import Pinecone
