@@ -48,32 +48,32 @@ class ResultService:
             logger.info(f"Result: {self.result_id} - Starting grading process")
             
             # 0. 시작 시점 (0%)
-            update_result_progress(self.result_id, 0, "processing")
+            update_result_progress(self.result_id, 0)
             await asyncio.sleep(0.1)
             
             # 1. PDF → PNG 분리 (0% - 10%)
             await self.convert_pdf_to_png()
-            update_result_progress(self.result_id, 10, "processing")
+            update_result_progress(self.result_id, 10)
             await asyncio.sleep(0.5)
             
             # 2. S3에 원본 저장 (10% - 20%)
             await self.upload_origin_files()
-            update_result_progress(self.result_id, 20, "processing")
+            update_result_progress(self.result_id, 20)
             await asyncio.sleep(0.5)
             
             # 3. OCR + LLM 처리 (20% - 30%)
             await self.process_ocr_and_llm()
-            update_result_progress(self.result_id, 30, "processing")
+            update_result_progress(self.result_id, 30)
             await asyncio.sleep(0.5)
             
             # 4. MongoDB에서 lang_type 조회 (30% - 40%)
             lang_type = await self.get_language_type()
-            update_result_progress(self.result_id, 40, "processing")
+            update_result_progress(self.result_id, 40)
             await asyncio.sleep(0.5)
             
             # 5. MongoDB에서 키워드 데이터 조회 (40% - 50%)
             await self.get_keyword_data()
-            update_result_progress(self.result_id, 50, "processing")
+            update_result_progress(self.result_id, 50)
             await asyncio.sleep(0.5)
             
             # 6. 오답 채점과 누락 판단을 병렬로 처리 (50% - 70%)
@@ -81,12 +81,12 @@ class ResultService:
                 self.grade_wrong_answers(lang_type),
                 self.detect_missing_answers()
             )
-            update_result_progress(self.result_id, 70, "processing")
+            update_result_progress(self.result_id, 70)
             await asyncio.sleep(0.5)
             
             # 7. 오답 하이라이트 이미지 생성 (70% - 80%)
             await self.generate_highlight_images()
-            update_result_progress(self.result_id, 80, "processing")
+            update_result_progress(self.result_id, 80)
             await asyncio.sleep(0.5)
             
             # 8. 하이라이트 이미지 S3 저장 (80% - 90%)
@@ -94,7 +94,7 @@ class ResultService:
             
             # 9. post_image_url 업데이트
             self.update_post_image_urls()
-            update_result_progress(self.result_id, 90, "processing")
+            update_result_progress(self.result_id, 90)
             await asyncio.sleep(0.5)
             
             # 10. MongoDB에 결과 저장 (90% - 100%)
@@ -115,12 +115,12 @@ class ResultService:
             
             complete_data = {
                 "resultId": self.db_result_id or self.result_id,
-                "status": "complete",
+                # "status": "complete",
                 "progress": 100,
                 "results": results_array
             }
             
-            update_result_progress(self.result_id, 100, "complete", complete_data)
+            update_result_progress(self.result_id, 100, complete_data)
             
             logger.info(f"Result: {self.result_id} - Grading process completed successfully")
             return self.build_response()
@@ -130,7 +130,7 @@ class ResultService:
             
             # 에러 발생 시 진행률 -1로 설정
             error_data = {"error": str(e)}
-            update_result_progress(self.result_id, -1, "error", error_data)
+            update_result_progress(self.result_id, -1, error_data)
             
             # 에러 발생 시에도 임시 파일 정리
             self.cleanup_temp_files()

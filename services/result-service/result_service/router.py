@@ -12,7 +12,7 @@ from common_sdk.auth import get_current_member
 from common_sdk.crud.s3 import S3Storage
 from common_sdk.crud.mongodb import MongoDB
 from common_sdk.swagger import result_service_response, result_service_space_response
-from common_sdk.sse import update_result_progress, get_result_progress_stream  # Result Service용 함수들 사용
+from common_sdk.sse import update_result_progress, get_result_progress_stream
 from common_sdk.exceptions import (
     MissingResultFileData, UnsupportedResultFileFormat,
     MissingResultId, ResultIdNotFound, ResultFileUploadPageExceeded
@@ -67,9 +67,9 @@ async def upload_result(
         result_id = str(ObjectId())
 
         # 초기 상태 설정 (Result Service용 함수 사용)
-        update_result_progress(result_id, 0, "processing", {
+        update_result_progress(result_id, 0, {
             "resultId": result_id,
-            "status": "processing"
+            # "status": "processing"
         })
 
         # 임시 디렉토리 생성
@@ -123,9 +123,9 @@ async def upload_result(
         service_instances[result_id] = service
 
         # 업로드 완료 후 진행률 초기화 (SSE 연결 전 미리 설정)
-        update_result_progress(result_id, 0, "processing", {
+        update_result_progress(result_id, 0, {
             "resultId": result_id,
-            "status": "processing"
+            # "status": "processing"
         })
 
         response = {
@@ -170,9 +170,9 @@ async def get_progress(
         
     except Exception as e:
         logger.error(f"User: {user_id} - Error in get_progress: {str(e)}")
-        update_result_progress(resultId, -1, "error", {
+        update_result_progress(resultId, -1, {
             "resultId": resultId,
-            "error": f"진행률 조회 실패: {str(e)}"
+            "error": {str(e)}
         })
         raise
 
