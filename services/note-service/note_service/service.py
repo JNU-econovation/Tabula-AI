@@ -11,9 +11,10 @@ from note_sdk.vector_store import VectorLoader
 from common_sdk.sse import update_progress
 from common_sdk.crud.mongodb import MongoDB
 from note_sdk.config import settings
-from common_sdk.exceptions import FileNotFoundError
+from common_sdk.exceptions import FileNotFoundError, TokenExceeded
 from common_sdk.get_logger import get_logger
 from common_sdk.constants import ProgressPhase, ProgressRange, StatusMessage
+from common_sdk.utils import num_tokens_from_string
 
 # 로거 설정
 logger = get_logger()

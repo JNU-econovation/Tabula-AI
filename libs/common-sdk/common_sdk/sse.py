@@ -5,7 +5,7 @@ from typing import Dict, Any
 from sse_starlette.sse import EventSourceResponse
 
 from common_sdk.get_logger import get_logger
-from common_sdk.constants import ProgressPhase, ProgressRange, StatusMessage
+from common_sdk.constants import StatusMessage
 
 logger = get_logger()
 
@@ -59,7 +59,6 @@ async def progress_generator(space_id: str, service: Any = None):
                             "success": True,
                             "response": {
                                 "progress": 100,
-                                "spaceId": result.get("spaceId"),
                                 "spaceName": result.get("spaceName"),
                             },
                             "error": None
@@ -78,14 +77,12 @@ async def progress_generator(space_id: str, service: Any = None):
                     break
                 else:
                     # 진행 중인 경우
-                    status_message = status.get("status", "처리 중")
                     yield {
                         "event": "progress",
                         "data": json.dumps({
                             "success": True,
                             "response": {
-                                "progress": progress,
-                                "status": status_message
+                                "progress": progress
                             },
                             "error": None
                         })
@@ -112,18 +109,16 @@ def get_progress_stream(space_id: str, service: Any = None):
 # 진행률 저장소
 result_progress_store: Dict[str, Dict[str, Any]] = {}
 
-def update_result_progress(result_id: str, progress: int, status: str = "processing", data: Dict[str, Any] = None):
+def update_result_progress(result_id: str, progress: int, data: Dict[str, Any] = None):
     """Result 전용 진행률 업데이트"""
     if result_id not in result_progress_store:
         result_progress_store[result_id] = {
             "progress": 0,
-            "status": "processing",
             "data": {}
         }
     
     result_progress_store[result_id]["progress"] = progress
-    result_progress_store[result_id]["status"] = status
-    
+
     if data:
         result_progress_store[result_id]["data"] = data
 
@@ -132,7 +127,7 @@ async def result_progress_generator(result_id: str, service: Any = None):
     try:
         # 1. 초기 상태 확인
         if result_id not in result_progress_store:
-            update_result_progress(result_id, 0, "processing")
+            update_result_progress(result_id, 0)
         
         # 2. 처리 시작
         if service:
@@ -144,7 +139,6 @@ async def result_progress_generator(result_id: str, service: Any = None):
             if result_id in result_progress_store:
                 data = result_progress_store[result_id]
                 progress = data["progress"]
-                status = data["status"]
                 result_data = data.get("data", {})
                 
                 # 4. 진행 상태에 따른 이벤트 전송
@@ -179,8 +173,7 @@ async def result_progress_generator(result_id: str, service: Any = None):
                         "data": json.dumps({
                             "success": True,
                             "response": {
-                                "progress": progress,
-                                "status": "processing"
+                                "progress": progress
                             },
                             "error": None
                         })

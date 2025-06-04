@@ -3,8 +3,8 @@ from fastapi.responses import JSONResponse
 from common_sdk.exceptions import (
     InvalidJWT, ExpiredJWT, EmptyJWT,
     MissingFieldData,
-    MissingNoteFileData, UnsupportedNoteFileFormat, NoteFileSizeExceeded,
-    MissingResultFileData, UnsupportedResultFileFormat, ResultFileSizeExceeded, ResultFileUploadPageExceeded,
+    MissingNoteFileData, UnsupportedNoteFileFormat, NoteFileSizeExceeded, TokenExceeded,
+    MissingResultFileData, UnsupportedResultFileFormat, ResultFileUploadPageExceeded,
     MissingSpaceId, SpaceIdNotFound,
     MissingResultId, ResultIdNotFound
 )
@@ -53,9 +53,9 @@ def register_exception_handlers(app: FastAPI):
     app.add_exception_handler(MissingNoteFileData, business_exception_handler)
     app.add_exception_handler(UnsupportedNoteFileFormat, business_exception_handler)
     app.add_exception_handler(NoteFileSizeExceeded, business_exception_handler)
+    app.add_exception_handler(TokenExceeded, business_exception_handler)
     app.add_exception_handler(MissingResultFileData, business_exception_handler)
     app.add_exception_handler(UnsupportedResultFileFormat, business_exception_handler)
-    app.add_exception_handler(ResultFileSizeExceeded, business_exception_handler)
     app.add_exception_handler(ResultFileUploadPageExceeded, business_exception_handler)
     app.add_exception_handler(MissingSpaceId, business_exception_handler)
     app.add_exception_handler(SpaceIdNotFound, business_exception_handler)

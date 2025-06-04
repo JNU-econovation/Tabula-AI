@@ -5,7 +5,7 @@ import asyncio
 
 from PIL import Image
 from typing import List, Dict
-from openai import OpenAI
+from openai import OpenAI, RateLimitError
 from langchain_openai import ChatOpenAI
 from tenacity import retry, stop_after_attempt, wait_exponential
 
@@ -154,8 +154,18 @@ class ImageSummary:
                 "position": image_info["position"],
                 "end_position": image_info["end_position"]
             }
+        
+        except RateLimitError as e:
+            logger.warning(f"[process_image] TPM RateLimitError occurred, waiting for 60 seconds: {str(e)}")
+            await asyncio.sleep(60)
+            # 재시도 횟수 초기화
+            raise
             
         except Exception as e:
+            if "TPM" in str(e) or "rate limit" in str(e).lower():
+                logger.warning(f"[process_image] TPM 관련 에러, 60초 대기 후 재시도: {str(e)}")
+                await asyncio.sleep(60)
+                raise
             error_path = actual_image_path if actual_image_path else image_info["path"]
             logger.error(f"[process_image] Image processing failed (path: {error_path}): {str(e)}")
             raise ImageProcessingError()
