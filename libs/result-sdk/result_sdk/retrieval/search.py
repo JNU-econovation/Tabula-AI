@@ -12,20 +12,20 @@ logger = get_logger()
 class PineconeSearcher:
     """Pinecone을 사용한 벡터 검색 클래스"""
     
-    def __init__(self, language: str = "ko"):
+    def __init__(self, language: str = "korean"):
         self.api_key = settings.PINECONE_API_KEY
         self.pc = Pinecone(api_key=self.api_key)
         self.language = language
         self.logger = get_logger()
         
         # 언어별 Dense 차원 설정
-        if language == "ko":
+        if language == "korean":
             self.dense_vector_dimension = 4096  # Upstage 임베딩
-        else:  # "en"
+        else:  # "english"
             self.dense_vector_dimension = 3072  # OpenAI 3-large 임베딩
         
         # Dense/Sparse 인덱스 이름 설정
-        if language == "ko":
+        if language == "korean":
             self.dense_index_name = settings.INDEX_NAME_KOR_DEN_CONTENTS
             self.sparse_index_name = settings.INDEX_NAME_KOR_SPA_CONTENTS
         else:
@@ -86,7 +86,7 @@ class PineconeSearcher:
     def dense_search(self, 
         query: str, 
         config: RetrievalConfig,
-        language: str = "ko"
+        language: str = "korean"
     ) -> List[SearchResult]:
         """Dense 벡터 검색 수행"""
         try:
@@ -179,7 +179,7 @@ class PineconeSearcher:
         query: str, 
         config: RetrievalConfig,
         bm25_encoder: BM25Encoder,
-        language: str = "ko"
+        language: str = "korean"
     ) -> HybridSearchResponse:
         """하이브리드 검색 (Dense + Sparse) 수행"""
         try:
@@ -373,7 +373,7 @@ class BM25Manager:
 class DocumentFinder:
     """문서 검색을 위한 통합 클래스"""
     
-    def __init__(self, language: str = "ko"):
+    def __init__(self, language: str = "korean"):
         self.pinecone_searcher = PineconeSearcher(language)
         self.bm25_manager = BM25Manager()
         self.logger = get_logger()
@@ -386,7 +386,7 @@ class DocumentFinder:
         self, 
         query: str, 
         config: RetrievalConfig,
-        language: str = "ko"
+        language: str = "korean"
     ) -> Optional[str]:
         """참고 텍스트 검색"""
         try:

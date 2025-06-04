@@ -20,7 +20,7 @@ from common_sdk import get_logger
 logger = get_logger()
 
 class TestGradingSystem:
-    def __init__(self, test_space_id: str = "6836e430e72c844ede76e9f5", test_index_name: str = None, lang_type: str = "ko"):
+    def __init__(self, test_space_id: str = "6836e430e72c844ede76e9f5", test_index_name: str = None, lang_type: str = "korean"):
         """테스트 초기화"""
         
         self.test_data_dir = Path(__file__).parent / "data"
@@ -45,13 +45,13 @@ class TestGradingSystem:
 
     def _get_index_name_by_language(self, lang_type: str) -> str:
         """언어 타입에 따른 인덱스 이름 반환"""
-        if lang_type == "ko":
+        if lang_type == "korean":
             # 한국어 Dense 인덱스 우선 사용
             if hasattr(settings, 'INDEX_NAME_KOR_DEN_CONTENTS') and settings.INDEX_NAME_KOR_DEN_CONTENTS:
                 return settings.INDEX_NAME_KOR_DEN_CONTENTS
             elif hasattr(settings, 'INDEX_NAME_KOR_SPA_CONTENTS') and settings.INDEX_NAME_KOR_SPA_CONTENTS:
                 return settings.INDEX_NAME_KOR_SPA_CONTENTS
-        elif lang_type == "en":
+        elif lang_type == "english":
             # 영어 Dense 인덱스 우선 사용
             if hasattr(settings, 'INDEX_NAME_ENG_DEN_CONTENTS') and settings.INDEX_NAME_ENG_DEN_CONTENTS:
                 return settings.INDEX_NAME_ENG_DEN_CONTENTS
@@ -147,7 +147,6 @@ class TestGradingSystem:
         try:
             config = GradingConfig(
                 space_id=self.test_space_id,
-                index_name=self.test_index_name,
                 prompt_template="Test prompt with {reference_text} and {user_text}",
                 openai_api_keys=self.openai_api_keys,
                 model_name="gpt-4.1-mini",
@@ -157,7 +156,6 @@ class TestGradingSystem:
             )
             
             assert config.space_id == self.test_space_id
-            assert config.index_name == self.test_index_name
             assert config.model_name == "gpt-4.1-mini"
             assert config.temperature == 0.0
             assert config.max_tokens == 1000
@@ -219,7 +217,6 @@ class TestGradingSystem:
         try:
             config = GradingConfig(
                 space_id=self.test_space_id,
-                index_name=self.test_index_name,
                 prompt_template="Test prompt",
                 openai_api_keys=self.openai_api_keys,
                 lang_type=self.lang_type
@@ -249,7 +246,6 @@ class TestGradingSystem:
         try:
             config = GradingConfig(
                 space_id=self.test_space_id,
-                index_name=self.test_index_name,
                 prompt_template="Test prompt",
                 openai_api_keys=self.openai_api_keys,
                 lang_type=self.lang_type
@@ -281,7 +277,6 @@ class TestGradingSystem:
         try:
             grading_service = GradingService(
                 space_id=self.test_space_id,
-                index_name=self.test_index_name,
                 openai_api_keys=self.openai_api_keys,
                 model_name="gpt-4.1-mini",
                 temperature=0.0,
@@ -297,7 +292,6 @@ class TestGradingSystem:
             
             # 설정 확인
             assert grading_service.config.space_id == self.test_space_id
-            assert grading_service.config.index_name == self.test_index_name
             assert grading_service.config.model_name == "gpt-4.1-mini"
             assert grading_service.config.lang_type == self.lang_type
             
@@ -357,14 +351,12 @@ class TestGradingSystem:
         try:
             grading_service = GradingService(
                 space_id=self.test_space_id,
-                index_name=self.test_index_name,
                 openai_api_keys=self.openai_api_keys,
                 model_name="gpt-4.1-mini",
                 lang_type=self.lang_type
             )
             
             logger.info(f"GradingService created with space_id: {self.test_space_id}")
-            logger.info(f"Index name: {self.test_index_name}")
             logger.info(f"Language type: {self.lang_type}")
             logger.info(f"User inputs length: {len(self.user_inputs)} characters")
             
@@ -387,14 +379,12 @@ class TestGradingSystem:
         try:
             grading_service = GradingService(
                 space_id=self.test_space_id,
-                index_name=self.test_index_name,
                 openai_api_keys=self.openai_api_keys,
                 lang_type=self.lang_type
             )
             
             logger.info("Starting full grading workflow test")
             logger.info(f"Space ID: {self.test_space_id}")
-            logger.info(f"Index Name: {self.test_index_name}")
             logger.info(f"Language Type: {self.lang_type}")
             
             start_time = datetime.now()
@@ -446,7 +436,6 @@ class TestGradingSystem:
         logger.info(f"Grading System Test: {self.test_id}")
         logger.info("=" * 50)
         logger.info(f"Space ID: {self.test_space_id}")
-        logger.info(f"Index Name: {self.test_index_name}")
         logger.info(f"Language Type: {self.lang_type}")  # 언어 타입 로깅 추가
         
         total_start_time = datetime.now()
@@ -602,8 +591,8 @@ async def main():
 
     # 한국어와 영어 테스트 모두 실행
     languages_to_test = [
-        {"lang": "ko", "name": "Korean"},
-        {"lang": "en", "name": "English"}
+        {"lang": "korean", "name": "Korean"},
+        {"lang": "english", "name": "English"}
     ]
     
     for lang_config in languages_to_test:
