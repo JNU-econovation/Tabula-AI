@@ -12,7 +12,7 @@ class GradingService:
         model_name: str = "gpt-4.1-mini",
         temperature: float = 0,
         max_tokens: int = 1000,
-        lang_type: str = "ko"
+        lang_type: str = "korean"
     ):
         """채점 서비스 초기화"""
 
