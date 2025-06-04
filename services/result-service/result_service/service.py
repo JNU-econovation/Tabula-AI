@@ -294,7 +294,7 @@ class ResultService:
             if not lang_type:
                 logger.warning(f"Result: {self.result_id} - Language type not found for space: {self.space_id}")
                 # 기본값으로 한국어 설정
-                lang_type = "ko"
+                lang_type = "korean"
             
             logger.info(f"Result: {self.result_id} - Language type retrieved: {lang_type}")
             return lang_type
@@ -302,8 +302,8 @@ class ResultService:
         except Exception as e:
             logger.error(f"Result: {self.result_id} - Error getting language type: {str(e)}")
             # 에러 발생 시 기본값으로 한국어 설정
-            logger.info(f"Result: {self.result_id} - Using default language type: ko")
-            return "ko"
+            logger.info(f"Result: {self.result_id} - Using default language type: korean")
+            return "korean"
 
     async def grade_wrong_answers(self, lang_type: str):
         """오답 채점 (GradingService 사용)"""

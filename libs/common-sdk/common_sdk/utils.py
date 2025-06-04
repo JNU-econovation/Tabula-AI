@@ -27,12 +27,12 @@ def num_tokens_from_string(string: str, encoding_name: str = "cl100k_base") -> i
     return num_tokens
 
 # 텍스트 임베딩 생성
-def get_embedding(text: str, language: Literal["ko", "en"] = "ko") -> List[float]:
+def get_embedding(text: str, language: Literal["korean", "english"] = "korean") -> List[float]:
 
     try:
         text = text.replace("\n", " ")
         
-        if language == "ko":
+        if language == "korean":
             response = upstage.embeddings.create(
                 input=[text], 
                 model="embedding-query"
