@@ -3,7 +3,7 @@
 import re
 import google.generativeai as genai
 from PIL import Image
-from Prompt import gemini_prompt as PROMPT_TEMPLATE # 프롬프트 템플릿은 build_full_prompt 함수로 전달받거나 직접 임포트
+# PROMPT_TEMPLATE will be passed as an argument
 
 # 이 함수는 OCR 결과를 LLM 프롬프트의 일부로 변환합니다.
 def format_ocr_results_for_prompt(ocr_block_results: list) -> str:
@@ -169,13 +169,7 @@ def process_llm_and_integrate(llm_output_string: str, original_ocr_results_for_b
             rag_ready_data_block.append([id_list_for_rag, [text_for_rag]])
     return consolidated_data_block, rag_ready_data_block
 
-
-
-
-
-
 # LLM_interaction.py TestCode
-
 if __name__ == '__main__':
     print("--- LLM_interaction.py 테스트 시작 ---")
 
@@ -212,7 +206,8 @@ if __name__ == '__main__':
     # --- 2. build_full_prompt 함수 테스트 ---
     print("\n[2. build_full_prompt 함수 테스트]")
     try:
-        from Prompt import gemini_prompt as TEST_PROMPT_TEMPLATE
+        # text_processing 내의 Prompt.py에서 가져오도록 수정
+        from .Prompt import gemini_prompt as TEST_PROMPT_TEMPLATE
         print("Prompt.py에서 gemini_prompt를 성공적으로 가져왔습니다.")
     except ImportError:
         print("Warning: Prompt.py 또는 gemini_prompt를 찾을 수 없습니다. 임시 프롬프트 템플릿을 사용합니다.")
@@ -229,24 +224,17 @@ if __name__ == '__main__':
     print("\n[3. get_llm_response 함수 테스트 (실제 API 호출)]")
     print("주의: 이 테스트는 실제 LLM API를 호출하므로 비용이 발생할 수 있고, 시간이 소요될 수 있습니다.")
     
-    # 테스트용 이미지 경로 (사용자님의 실제 이미지 경로로 변경 필요)
-    # 작은 테스트용 이미지를 사용하거나, 기존 PDF의 첫 페이지 이미지 경로를 사용하세요.
-    # 예: sample_image_path = "path/to/your/test_image.png" 
-    #     또는 image_files_to_process[0] (메인 스크립트 실행 후 변수가 살아있다면)
-    sample_image_path = "" # <<--- 여기에 실제 이미지 파일 경로를 입력하세요!
-                           # 예: "/Users/ki/Desktop/Google Drive/Dev/Ecode/OCR_Test/temp_pdf_converted_images_by_block_parallel/예시_한국사_page_1.png"
-                           # 이 경로가 없으면 아래 테스트는 건너<0xEB><0x9C><0x84>니다.
+    sample_image_path = "" 
 
     if os.path.exists(sample_image_path):
-        test_generation_config = {"temperature": 0.1, "max_output_tokens": 50} # 간단한 테스트용 설정
-        test_safety_settings = [ # BLOCK_NONE으로 테스트
+        test_generation_config = {"temperature": 0.1, "max_output_tokens": 50} 
+        test_safety_settings = [ 
             {"category": genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
             {"category": genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
             {"category": genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
             {"category": genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
         ]
         
-        # 매우 간단한 프롬프트로 테스트
         simple_ocr_for_llm_test = "ID(1,0,1,1): 안녕하세요"
         simple_full_prompt = TEST_PROMPT_TEMPLATE.replace("{ocr_chunk_list_placeholder}", simple_ocr_for_llm_test)
         
@@ -268,14 +256,13 @@ if __name__ == '__main__':
 ID(1,0,1,2): __MERGED_TO_ID(1,0,1,1)__
 ID(1,0,2,1): __REMOVED__
 ID(1,0,3,1): 이것은 처리됨"""
-    # ID(1,0,3,2)는 LLM 응답에 없음 -> UNPROCESSED_BY_LLM 예상
 
     mock_original_for_integrate = [
         {'page_num': 1, 'block_id': 0, 'y_idx': 1, 'x_idx': 1, 'text': '원본 첫번째', 'x1':10, 'y1':10, 'x2':20, 'y2':20, 'bounding_box':[]},
         {'page_num': 1, 'block_id': 0, 'y_idx': 1, 'x_idx': 2, 'text': '원본 텍스트', 'x1':20, 'y1':10, 'x2':30, 'y2':20, 'bounding_box':[]},
         {'page_num': 1, 'block_id': 0, 'y_idx': 2, 'x_idx': 1, 'text': '원본 다음줄', 'x1':10, 'y1':20, 'x2':20, 'y2':30, 'bounding_box':[]},
         {'page_num': 1, 'block_id': 0, 'y_idx': 3, 'x_idx': 1, 'text': '이것은', 'x1':10, 'y1':30, 'x2':20, 'y2':40, 'bounding_box':[]},
-        {'page_num': 1, 'block_id': 0, 'y_idx': 3, 'x_idx': 2, 'text': '처리안됨', 'x1':20, 'y1':30, 'x2':30, 'y2':40, 'bounding_box':[]}, # 이 ID는 LLM 응답에 없음
+        {'page_num': 1, 'block_id': 0, 'y_idx': 3, 'x_idx': 2, 'text': '처리안됨', 'x1':20, 'y1':30, 'x2':30, 'y2':40, 'bounding_box':[]}, 
     ]
 
     consolidated_data, rag_data = process_llm_and_integrate(mock_llm_output, mock_original_for_integrate)
@@ -290,7 +277,6 @@ ID(1,0,3,1): 이것은 처리됨"""
     for item in rag_data:
         print(f"  {item}")
 
-    # 검증 (예시)
     assert len(consolidated_data) == 5
     assert consolidated_data[0]['llm_status'] == 'PROCESSED'
     assert consolidated_data[0]['llm_processed_text'] == '수정된 첫번째 텍스트'
@@ -298,11 +284,11 @@ ID(1,0,3,1): 이것은 처리됨"""
     assert consolidated_data[1]['llm_merged_target_id'] == (1,0,1,1)
     assert consolidated_data[2]['llm_status'] == 'REMOVED'
     assert consolidated_data[3]['llm_status'] == 'PROCESSED'
-    assert consolidated_data[4]['llm_status'] == 'UNPROCESSED_BY_LLM' # LLM 응답에 없었으므로
+    assert consolidated_data[4]['llm_status'] == 'UNPROCESSED_BY_LLM' 
     
-    assert len(rag_data) == 2 # PROCESSED 상태인 것들만
-    assert rag_data[0][0] == [1,0,1,1] # ID(1,0,1,1)
-    assert rag_data[1][0] == [1,0,3,1] # ID(1,0,3,1)
+    assert len(rag_data) == 2 
+    assert rag_data[0][0] == [1,0,1,1] 
+    assert rag_data[1][0] == [1,0,3,1] 
 
     print("process_llm_and_integrate 함수 테스트 통과!")
 

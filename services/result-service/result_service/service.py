@@ -10,11 +10,21 @@ from common_sdk import get_logger
 from common_sdk.crud.s3 import S3Storage
 from common_sdk.crud.mongodb import MongoDB
 from common_sdk.sse import update_result_progress
+# result_sdk의 __init__.py를 통해 주요 기능을 가져옴
+from result_sdk import settings as result_sdk_settings
+from result_sdk import process_document
+from result_sdk import draw_underlines_for_incorrect_answers_enhanced
 from result_sdk.grading import GradingService
 from result_sdk.missing import MissingAnalyzer
+from common_sdk.prompt_loader import PromptLoader # PromptLoader 임포트
+import google.generativeai as genai # process_document 내부에서 사용될 수 있으므로, genai 설정은 여기서도 확인
 
 # 로거 설정
 logger = get_logger()
+
+# 프롬프트 로더 인스턴스화 (클래스 레벨 또는 __init__에서)
+# 여기서는 클래스 외부 또는 필요시점에 로드하도록 변경 가능
+# PROMPT_TEMPLATE 변수는 process_ocr_and_llm 메서드 내에서 로드하도록 변경
 
 # MongoDB 인스턴스
 mongodb = MongoDB()
@@ -34,9 +44,11 @@ class ResultService:
         # 처리 결과 저장 변수들
         self.png_files: List[str] = []
         self.origin_urls: List[Dict] = []
-        self.ocr_results: List[str] = []
+        self.ocr_results: List[str] = [] # GradingService 입력용 (JSON 문자열화된 RAG 데이터)
+        self.all_consolidated_data: List[Dict] = [] # process_document 결과 (시각화용)
+        self.all_rag_ready_data: List[List[Any]] = [] # process_document 결과 (시각화 및 채점 입력용)
         self.wrong_answers: List[Dict] = []
-        self.wrong_answer_ids: List[List[int]] = []
+        self.wrong_answer_ids: List[List[int]] = [] # draw_underlines_for_incorrect_answers_enhanced 입력용
         self.missing_answers: List[str] = []
         self.highlight_urls: List[str] = []
         self.keyword_data: Dict = None
@@ -239,48 +251,63 @@ class ResultService:
             raise Exception(f"S3 원본 파일 업로드 중 오류 발생: {str(e)}")
 
     async def process_ocr_and_llm(self):
-        """OCR + LLM 처리 (목데이터)"""
+        """OCR + LLM 처리 (result_sdk.process_document 사용)"""
         try:
-            logger.info(f"Result: {self.result_id} - Starting OCR + LLM processing")
+            logger.info(f"Result: {self.result_id} - Starting OCR + LLM processing using result_sdk.process_document")
             
             if not self.png_files:
-                raise Exception("PNG 파일이 없습니다. convert_pdf_to_png()를 먼저 실행해주세요.")
+                if not self.file_paths:
+                     raise Exception("No input file paths available for OCR+LLM processing.")
+                input_for_processing = self.file_paths[0] 
+                logger.info(f"Result: {self.result_id} - No pre-converted PNGs (self.png_files empty), using original input: {input_for_processing}")
+            else:
+                input_for_processing = self.file_paths[0]
+                logger.info(f"Result: {self.result_id} - Using original input for process_document: {input_for_processing}, expecting it to use pre-converted PNGs if applicable.")
+
+            if not result_sdk_settings.GOOGLE_API_KEY:
+                raise ValueError("GOOGLE_API_KEY is not set in result_sdk.config.settings")
+            genai.configure(api_key=result_sdk_settings.GOOGLE_API_KEY)
+
+            try:
+                prompt_loader = PromptLoader()
+                prompt_data = prompt_loader.load_prompt('ocr-prompt') 
+                loaded_prompt_template = prompt_data['template']
+                logger.info(f"Result: {self.result_id} - OCR Prompt loaded successfully via PromptLoader.")
+            except Exception as e_prompt:
+                logger.error(f"Result: {self.result_id} - Failed to load OCR-PROMPT via PromptLoader: {e_prompt}", exc_info=True)
+                loaded_prompt_template = "Error loading prompt. OCR Data: {ocr_chunk_list_placeholder}"
+
+            processed_data = process_document(
+                input_file_path=input_for_processing,
+                service_account_file=result_sdk_settings.SERVICE_ACCOUNT_FILE,
+                temp_base_dir=result_sdk_settings.BASE_TEMP_DIR,
+                prompt_template=loaded_prompt_template,
+                generation_config=result_sdk_settings.GENERATION_CONFIG,
+                safety_settings=result_sdk_settings.SAFETY_SETTINGS,
+                pre_converted_image_paths=self.png_files # 이미 변환된 PNG 파일 경로 전달
+            )
             
-            # 목데이터 - 실제로는 각 PNG 파일에 대해 OCR + LLM 처리
-            mock_ocr_results = [
-                [[1, 0, 1, 1], ["경상도"]],
-                [[1, 0, 2, 1], ["대구"]],
-                [[1, 0, 3, 2], ["후삼국 통일 과정 중 공산 전투"]],
-                [[1, 0, 4, 2], ["대구 팔공산 부인사(초조대장경 소실, 몽골 2차 침입)"]],
-                [[1, 0, 5, 2], ["국채 보상 운동 (1907), 국채보상기성회"]],
-                [[1, 0, 6, 2], ["대한회 (1915), 공화 정체 국가 건설 지향, 총사령 박상진, 군대식 조직"]],
-                [[1, 0, 7, 2], ["대구 2.28 민주화 운동(4.19 혁명 시발점), 이승만 정부 반발 민주화 운동"]],
-                [[1, 0, 8, 1], ["경주(서라벌, 사로국, 계림)"]],
-                [[1, 0, 9, 2], ["김유신묘(12지신상)"]],
-                [[1, 0, 10, 2], ["천마총(돌무지 덧널 무덤, 천마도)"]],
-                [[2, 0, 1, 1], ["기타"]],
-                [[2, 0, 2, 1], ["제주"]],
-                [[2, 0, 3, 2], ["김만덕 빈민구제활동"]],
-                [[2, 0, 4, 2], ["네덜란드 하멜 현종때 표류"]],
-                [[2, 0, 5, 2], ["삼별초 마지막 항전지, 원 탐라총관부"]],
-                [[2, 0, 6, 2], ["제주 4.3 사건"]],
-                [[2, 0, 7, 2], ["제주 고산리 신석기 유적"]],
-                [[2, 0, 9, 1], ["강릉"]],
-                [[2, 0, 10, 2], ["율곡이이 오죽헌"]]
-            ]
+            # process_document는 이제 (all_consolidated_data, all_rag_ready_data, image_files_used, temp_folder_created)를 반환
+            # image_files_used는 pre_converted_image_paths가 제공되면 해당 경로를, 아니면 input_handler가 생성한 경로를 가짐
+            self.all_consolidated_data, self.all_rag_ready_data, image_files_actually_used, _ = processed_data
             
-            # 실제 처리 시뮬레이션
-            for i, png_file in enumerate(self.png_files):
-                logger.info(f"Result: {self.result_id} - Processing OCR + LLM for page {i+1}: {png_file}")
-                # 실제로는 여기서 OCR + LLM API 호출
+            # self.png_files는 convert_pdf_to_png에서 이미 설정되었으므로, 여기서 다시 업데이트할 필요는 없음
+            # 다만, 로깅이나 디버깅 목적으로 image_files_actually_used를 확인할 수는 있음
+            if image_files_actually_used and not self.png_files: # 이 경우는 발생하지 않아야 함 (self.png_files가 먼저 채워지므로)
+                logger.warning(f"Result: {self.result_id} - self.png_files was empty but process_document returned image paths. This is unexpected.")
+                self.png_files = image_files_actually_used
+            elif image_files_actually_used and set(self.png_files) != set(image_files_actually_used):
+                 logger.info(f"Result: {self.result_id} - Image paths from convert_pdf_to_png and process_document differ. Using paths from convert_pdf_to_png.")
+                 # self.png_files를 그대로 유지 (convert_pdf_to_png의 결과가 우선)
+
+            self.ocr_results = json.dumps(self.all_rag_ready_data, ensure_ascii=False) if self.all_rag_ready_data else "[]"
             
-            # 목데이터를 결과로 저장
-            self.ocr_results = mock_ocr_results
-            
-            logger.info(f"Result: {self.result_id} - OCR + LLM processing completed. Total items: {len(self.ocr_results)}")
+            logger.info(f"Result: {self.result_id} - OCR + LLM processing completed. Consolidated items: {len(self.all_consolidated_data)}, RAG items: {len(self.all_rag_ready_data)}")
+            logger.info(f"RAG items: {self.all_rag_ready_data}")
+            logger.info(f"RAG Data type: {self.all_rag_ready_data}")
             
         except Exception as e:
-            logger.error(f"Result: {self.result_id} - Error in OCR + LLM processing: {str(e)}")
+            logger.error(f"Result: {self.result_id} - Error in OCR + LLM processing: {str(e)}", exc_info=True)
             raise Exception(f"OCR + LLM 처리 중 오류 발생: {str(e)}")
 
     async def get_language_type(self) -> str:
@@ -288,12 +315,10 @@ class ResultService:
         try:
             logger.info(f"Result: {self.result_id} - Getting language type for space: {self.space_id}")
             
-            # MongoDB에서 해당 space_id의 lang_type 조회
             lang_type = self.mongodb.get_space_lang_type(self.space_id)
             
             if not lang_type:
                 logger.warning(f"Result: {self.result_id} - Language type not found for space: {self.space_id}")
-                # 기본값으로 한국어 설정
                 lang_type = "korean"
             
             logger.info(f"Result: {self.result_id} - Language type retrieved: {lang_type}")
@@ -301,7 +326,6 @@ class ResultService:
             
         except Exception as e:
             logger.error(f"Result: {self.result_id} - Error getting language type: {str(e)}")
-            # 에러 발생 시 기본값으로 한국어 설정
             logger.info(f"Result: {self.result_id} - Using default language type: korean")
             return "korean"
 
@@ -310,11 +334,14 @@ class ResultService:
         try:
             logger.info(f"Result: {self.result_id} - Starting grading process with language: {lang_type}")
             
-            if not self.ocr_results:
+            if not self.ocr_results: # self.ocr_results는 이미 JSON 문자열임
+                logger.warning(f"Result: {self.result_id} - self.ocr_results is empty. Raising exception.")
                 raise Exception("OCR 결과가 없습니다. process_ocr_and_llm()를 먼저 실행해주세요.")
             
             # OCR 결과를 GradingService 입력 형태로 변환
-            user_inputs = json.dumps(self.ocr_results)
+            # self.ocr_results는 이미 JSON 문자열이므로, 다시 dumps하지 않음.
+            user_inputs = self.ocr_results
+            logger.info(f"Result: {self.result_id} - user_inputs for GradingService (type: {type(user_inputs)}): {user_inputs[:200]}...") # 타입 및 내용 일부 로깅
             
             # GradingService 인스턴스 생성
             grading_service = GradingService(
@@ -327,32 +354,27 @@ class ResultService:
             # 채점 실행 및 오답 ID 추출
             evaluation_response, wrong_ids = await grading_service.grade_with_wrong_ids(user_inputs)
             
-            # 오답 ID 저장
             self.wrong_answer_ids = wrong_ids if wrong_ids else []
             
-            # MongoDB 구조에 맞게 채점 결과 처리 (post_image_url은 하이라이트 이미지 생성 후 업데이트)
             self.wrong_answers = {"results": []}
             
             if evaluation_response.results:
                 logger.info(f"Result: {self.result_id} - Found evaluation results for {len(evaluation_response.results)} pages")
                 
-                # 페이지별로 오답 정보 처리
                 for page_result in evaluation_response.results:
                     page_number = page_result.page
                     
-                    # 페이지별 결과 구조 생성 (post_image_url은 빈 문자열로 초기화)
                     page_data = {
                         "page": page_number,
                         "post_image_url": "",
                         "result": []
                     }
                     
-                    # 해당 페이지의 오답들 처리
                     for idx, wrong_answer in enumerate(page_result.wrong_answers, 1):
                         wrong_data = {
-                            "id": idx,  # auto increment ID
-                            "wrong": wrong_answer.wrong_answer,  # 틀린 답
-                            "feedback": wrong_answer.feedback  # 피드백
+                            "id": idx,  
+                            "wrong": wrong_answer.wrong_answer,  
+                            "feedback": wrong_answer.feedback  
                         }
                         page_data["result"].append(wrong_data)
                         
@@ -370,33 +392,40 @@ class ResultService:
             raise Exception(f"채점 처리 중 오류 발생: {str(e)}")
 
     async def generate_highlight_images(self):
-        """오답 하이라이트 이미지 생성 (목데이터)"""
+        """오답 하이라이트 이미지 생성 (result_sdk.draw_underlines_for_incorrect_answers_enhanced 사용)"""
         try:
-            logger.info(f"Result: {self.result_id} - Starting highlight image generation")
-            
+            logger.info(f"Result: {self.result_id} - Starting highlight image generation using result_sdk")
+
             if not self.wrong_answer_ids:
-                logger.info(f"Result: {self.result_id} - No wrong answers found, skipping highlight generation")
+                logger.info(f"Result: {self.result_id} - No wrong answer IDs found, skipping highlight generation.")
                 return
+            if not self.all_consolidated_data:
+                logger.warning(f"Result: {self.result_id} - No consolidated data available, skipping highlight generation.")
+                return
+            if not self.png_files: 
+                logger.warning(f"Result: {self.result_id} - No image paths available (self.png_files is empty), skipping highlight generation.")
+                return
+
+            output_highlight_folder = Path(self.png_files[0]).parent / "highlights_sdk" 
+            if output_highlight_folder.exists():
+                shutil.rmtree(output_highlight_folder) 
+            output_highlight_folder.mkdir(exist_ok=True)
             
-            # 하이라이트 이미지들을 저장할 디렉토리 생성
-            highlight_dir = Path(self.png_files[0]).parent / "highlights"
-            highlight_dir.mkdir(exist_ok=True)
+            logger.info(f"Result: {self.result_id} - Highlight images will be saved to: {output_highlight_folder}")
             
-            # 원본 PNG 파일들을 하이라이트 이미지로 복사 (목데이터)
-            for i, png_file in enumerate(self.png_files):
-                page_num = i + 1
-                highlight_filename = f"highlight_page_{page_num:03d}.png"
-                highlight_path = highlight_dir / highlight_filename
-                
-                # 원본 파일을 하이라이트 디렉토리로 복사
-                shutil.copy2(png_file, highlight_path)
-                
-                logger.info(f"Result: {self.result_id} - Mock highlight image created for page {page_num}")
+            await asyncio.to_thread(
+                draw_underlines_for_incorrect_answers_enhanced,
+                incorrect_rag_ids=self.wrong_answer_ids,
+                all_consolidated_data=self.all_consolidated_data,
+                all_rag_ready_data=self.all_rag_ready_data, 
+                page_image_paths=self.png_files, 
+                output_folder=str(output_highlight_folder),
+            )
             
-            logger.info(f"Result: {self.result_id} - Highlight image generation completed")
+            logger.info(f"Result: {self.result_id} - Highlight image generation completed by result_sdk.")
             
         except Exception as e:
-            logger.error(f"Result: {self.result_id} - Error generating highlight images: {str(e)}")
+            logger.error(f"Result: {self.result_id} - Error generating highlight images: {str(e)}", exc_info=True)
             raise Exception(f"하이라이트 이미지 생성 중 오류 발생: {str(e)}")
 
     async def upload_highlight_images(self):
@@ -404,34 +433,33 @@ class ResultService:
         try:
             logger.info(f"Result: {self.result_id} - Starting highlight images upload to S3")
             
-            # 하이라이트 이미지 디렉토리 확인
             if not self.png_files:
                 logger.info(f"Result: {self.result_id} - No PNG files found, skipping highlight upload")
                 return
             
-            highlight_dir = Path(self.png_files[0]).parent / "highlights"
+            highlight_dir = Path(self.png_files[0]).parent / "highlights_sdk" 
             if not highlight_dir.exists():
-                logger.info(f"Result: {self.result_id} - No highlight directory found, skipping highlight upload")
+                logger.info(f"Result: {self.result_id} - No highlight directory '{highlight_dir}' found, skipping highlight upload")
                 return
             
-            # 하이라이트 이미지 파일들 찾기
-            highlight_files = list(highlight_dir.glob("highlight_page_*.png"))
+            highlight_files = list(highlight_dir.glob("page_*_visualized_*.png")) 
             
             if not highlight_files:
-                logger.info(f"Result: {self.result_id} - No highlight images found, skipping highlight upload")
+                logger.info(f"Result: {self.result_id} - No highlight images found in '{highlight_dir}' with pattern 'page_*_visualized_*.png', skipping highlight upload")
                 return
             
             self.highlight_urls = []
             
-            # 각 하이라이트 이미지를 S3에 업로드
             for highlight_file in highlight_files:
                 try:
-                    # 파일명에서 페이지 번호 추출
                     filename = highlight_file.name
-                    page_num_str = filename.split('_')[-1].split('.')[0]
-                    page_num = int(page_num_str)
-                    
-                    # S3에 하이라이트 이미지 업로드
+                    try:
+                        page_num_str = filename.split("page_")[1].split("_")[0]
+                        page_num = int(page_num_str)
+                    except (IndexError, ValueError) as e_parse:
+                        logger.error(f"Result: {self.result_id} - Error parsing page number from filename '{filename}': {e_parse}. Skipping this file.")
+                        continue
+                        
                     s3_result = self.s3_storage.upload_post_image(
                         file_path=str(highlight_file),
                         user_id=self.user_id,
@@ -440,7 +468,6 @@ class ResultService:
                         page=page_num
                     )
                     
-                    # 업로드 결과를 highlight_urls 리스트에 저장
                     highlight_data = {
                         "id": page_num,
                         "s3_key": s3_result["s3_key"],
@@ -473,7 +500,6 @@ class ResultService:
                 logger.info(f"Result: {self.result_id} - No highlight URLs or wrong answers to update")
                 return
             
-            # 페이지별 하이라이트 URL 매핑 생성
             page_url_map = {}
             for highlight_data in self.highlight_urls:
                 page_id = highlight_data.get('id')
@@ -481,7 +507,6 @@ class ResultService:
                 if page_id:
                     page_url_map[page_id] = url
             
-            # wrong_answers의 각 페이지에 post_image_url 업데이트
             for page_data in self.wrong_answers["results"]:
                 page_number = page_data.get("page")
                 if page_number in page_url_map:
@@ -521,31 +546,29 @@ class ResultService:
         try:
             logger.info(f"Result: {self.result_id} - Starting missing answer detection")
             
-            if not self.ocr_results:
+            if not self.ocr_results: # self.ocr_results는 이미 JSON 문자열임
+                logger.warning(f"Result: {self.result_id} - self.ocr_results is empty for missing answers. Raising exception.")
                 raise Exception("OCR 결과가 없습니다. process_ocr_and_llm()를 먼저 실행해주세요.")
             
-            # 키워드 데이터가 있는지 확인
             if not self.keyword_data:
                 logger.warning(f"Result: {self.result_id} - No keyword data available for missing analysis")
                 self.missing_answers = []
                 return
             
-            # OCR 결과를 MissingAnalyzer 입력 형태로 변환
-            user_inputs = json.dumps(self.ocr_results)
-            
-            # MissingAnalyzer 인스턴스 생성
+            # MissingAnalyzer는 JSON 문자열을 기대하므로, self.ocr_results를 그대로 사용
+            user_inputs_for_missing = self.ocr_results
+            logger.info(f"Result: {self.result_id} - user_inputs for MissingAnalyzer (type: {type(user_inputs_for_missing)}): {user_inputs_for_missing[:200]}...")
+
             missing_analyzer = MissingAnalyzer()
             
             logger.info(f"Result: {self.result_id} - Starting missing analysis with MissingAnalyzer")
             
-            # 누락 분석 실행
-            missing_result = await missing_analyzer.analyze(self.space_id, user_inputs)
+            missing_result = await missing_analyzer.analyze(self.space_id, user_inputs_for_missing)
             
             logger.info(f"Result: {self.result_id} - Missing analysis result structure: {type(missing_result)}")
             if isinstance(missing_result, dict):
                 logger.info(f"Result: {self.result_id} - Missing analysis result keys: {list(missing_result.keys())}")
             
-            # 누락 분석 결과 처리
             if isinstance(missing_result, dict):
                 if missing_result.get("success", False):
                     missing_items = missing_result.get("missing_items", [])
@@ -571,7 +594,6 @@ class ResultService:
         try:
             logger.info(f"Result: {self.result_id} - Starting save results to MongoDB")
             
-            # origin_urls에서 URL 정보만 추출하여 저장
             origin_result_url = []
             for origin_url in self.origin_urls:
                 origin_result_url.append({
@@ -581,7 +603,6 @@ class ResultService:
                     "bucket": origin_url.get("bucket")
                 })
             
-            # MongoDB에 결과 저장
             result_data = self.mongodb.create_result(
                 space_id=self.space_id,
                 origin_result_url=origin_result_url,
@@ -591,7 +612,6 @@ class ResultService:
             
             logger.info(f"Result: {self.result_id} - Results saved to MongoDB successfully. DB Result ID: {result_data.get('_id')}")
             
-            # 저장된 결과 ID를 로그에 기록
             if result_data.get('_id'):
                 self.db_result_id = str(result_data['_id'])
                 logger.info(f"Result: {self.result_id} - MongoDB document created with ID: {result_data['_id']}")

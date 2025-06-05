@@ -29,7 +29,17 @@ from .grading import (
     EvaluationResponse,
     GradingNodes,
     CorrectionWorkflow,
-    GradingService
+    GradingService,
+)
+
+# Text Processing
+from .text_processing import (
+    process_document
+)
+
+# Output Visualization
+from .output_visualization import (
+    draw_underlines_for_incorrect_answers_enhanced
 )
 
 __all__ = [
@@ -60,6 +70,12 @@ __all__ = [
     "GradingNodes",
     "CorrectionWorkflow",
     "GradingService",
-    "process_correction",
-    "extract_wrong_answer_ids"
+    # "process_correction", # grading 모듈 내 실제 정의 위치 확인 후 주석 해제 또는 수정
+    # "extract_wrong_answer_ids", # grading 모듈 내 실제 정의 위치 확인 후 주석 해제 또는 수정
+    
+    # Text Processing
+    "process_document",
+    
+    # Output Visualization
+    "draw_underlines_for_incorrect_answers_enhanced"
 ]

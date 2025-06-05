@@ -213,3 +213,6 @@ pyrightconfig.json
 
 # log
 *.log
+
+# Google Vision API json
+libs/common-sdk/common_sdk/ecode-458109-73d063ae5f2a.json

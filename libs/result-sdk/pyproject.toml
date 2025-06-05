@@ -13,6 +13,14 @@ langgraph = "0.4.3"
 pinecone = "6.0.2"
 pinecone-text = "0.10.0"
 pymupdf = "^1.26.0"
+python-dotenv = "^1.0.0"
+google-generativeai = "^0.7.0"
+pillow = "^10.3.0"
+requests = "^2.31.0"
+opencv-python = "^4.9.0"
+google-auth = "^2.29.0"
+pdf2image = "^1.17.0"
+pytest-mock = "^3.14.1"
 
 
 [build-system]
