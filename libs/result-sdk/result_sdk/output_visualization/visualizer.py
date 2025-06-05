@@ -29,7 +29,17 @@ def draw_underlines_for_incorrect_answers_enhanced(
         return
     # all_rag_ready_data는 비어있을 수도 있지만, incorrect_rag_ids가 있다면 사용됨
 
-    incorrect_anchor_ids_set = set(incorrect_rag_ids)
+    # 입력된 incorrect_rag_ids의 각 요소가 리스트라면 튜플로 변환
+    processed_incorrect_rag_ids = []
+    if incorrect_rag_ids: # incorrect_rag_ids가 None이거나 비어있지 않은 경우에만 처리
+        for item in incorrect_rag_ids:
+            if isinstance(item, list):
+                processed_incorrect_rag_ids.append(tuple(item))
+            else:
+                # 이미 튜플이거나 다른 해시 가능한 타입일 수 있으므로 그대로 추가
+                processed_incorrect_rag_ids.append(item) 
+    # 이제 processed_incorrect_rag_ids를 사용하여 set을 만듭니다.
+    incorrect_anchor_ids_set = set(processed_incorrect_rag_ids)
     
     flat_rag_anchor_ids = []
     if all_rag_ready_data: # all_rag_ready_data가 None이거나 비어있지 않을 때만 처리
