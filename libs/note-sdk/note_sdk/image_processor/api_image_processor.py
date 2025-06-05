@@ -163,7 +163,7 @@ class ImageSummary:
             
         except Exception as e:
             if "TPM" in str(e) or "rate limit" in str(e).lower():
-                logger.warning(f"[process_image] TPM 관련 에러, 60초 대기 후 재시도: {str(e)}")
+                logger.warning(f"[process_image] TPM Error, waiting for 60 seconds and retrying: {str(e)}")
                 await asyncio.sleep(60)
                 raise
             error_path = actual_image_path if actual_image_path else image_info["path"]

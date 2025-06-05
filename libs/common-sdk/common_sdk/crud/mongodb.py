@@ -66,13 +66,14 @@ class MongoDB:
         try:
             # ObjectId 생성
             object_id = ObjectId(space_id)
+            object_folder_id = ObjectId(folder_id)
             
             # 현재 시간을 한국 시간으로 변환
             now = datetime.now(kst)
             
             space_data = {
                 "_id": object_id,
-                "folder_id": folder_id,
+                "folder_id": object_folder_id,
                 "space_name": space_name,
                 "file_url": file_url,
                 "file_name": file_name,
