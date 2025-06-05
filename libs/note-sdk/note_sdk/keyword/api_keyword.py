@@ -132,7 +132,7 @@ class KeywordGuide:
         user_prompt = self.create_mindmap_prompt(content)
 
         # 마인드맵 생성용 시스템 프롬프트
-        system_prompt = "당신은 문서를 분석하여 JSON 형식의 마인드맵을 생성하는 정확하고 지시를 잘 따르는 AI 어시스턴트입니다."
+        system_prompt = "You are an AI assistant that analyzes a document and creates a JSON-formatted mind map. You are precise and follow instructions carefully."
         
         mindmap_data = self.call_llm(system_prompt_content=system_prompt, user_prompt_content=user_prompt)
         

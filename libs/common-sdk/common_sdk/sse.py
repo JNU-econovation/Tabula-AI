@@ -59,7 +59,8 @@ async def progress_generator(space_id: str, service: Any = None):
                             "success": True,
                             "response": {
                                 "progress": 100,
-                                "spaceName": result.get("spaceName"),
+                                "spaceId": result.get("spaceId"),
+                                "spaceName": result.get("spaceName")
                             },
                             "error": None
                         })
