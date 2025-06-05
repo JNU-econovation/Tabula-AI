@@ -278,24 +278,33 @@ class ResultService:
                 loaded_prompt_template = "Error loading prompt. OCR Data: {ocr_chunk_list_placeholder}"
 
             processed_data = process_document(
-                input_file_path=input_for_processing, 
+                input_file_path=input_for_processing,
                 service_account_file=result_sdk_settings.SERVICE_ACCOUNT_FILE,
-                temp_base_dir=result_sdk_settings.BASE_TEMP_DIR, 
-                prompt_template=loaded_prompt_template, 
+                temp_base_dir=result_sdk_settings.BASE_TEMP_DIR,
+                prompt_template=loaded_prompt_template,
                 generation_config=result_sdk_settings.GENERATION_CONFIG,
-                safety_settings=result_sdk_settings.SAFETY_SETTINGS
+                safety_settings=result_sdk_settings.SAFETY_SETTINGS,
+                pre_converted_image_paths=self.png_files # 이미 변환된 PNG 파일 경로 전달
             )
             
-            self.all_consolidated_data, self.all_rag_ready_data, returned_image_paths, _ = processed_data
+            # process_document는 이제 (all_consolidated_data, all_rag_ready_data, image_files_used, temp_folder_created)를 반환
+            # image_files_used는 pre_converted_image_paths가 제공되면 해당 경로를, 아니면 input_handler가 생성한 경로를 가짐
+            self.all_consolidated_data, self.all_rag_ready_data, image_files_actually_used, _ = processed_data
             
-            if returned_image_paths:
-                self.png_files = returned_image_paths
-                logger.info(f"Result: {self.result_id} - Updated self.png_files with paths from process_document: {len(self.png_files)} files.")
+            # self.png_files는 convert_pdf_to_png에서 이미 설정되었으므로, 여기서 다시 업데이트할 필요는 없음
+            # 다만, 로깅이나 디버깅 목적으로 image_files_actually_used를 확인할 수는 있음
+            if image_files_actually_used and not self.png_files: # 이 경우는 발생하지 않아야 함 (self.png_files가 먼저 채워지므로)
+                logger.warning(f"Result: {self.result_id} - self.png_files was empty but process_document returned image paths. This is unexpected.")
+                self.png_files = image_files_actually_used
+            elif image_files_actually_used and set(self.png_files) != set(image_files_actually_used):
+                 logger.info(f"Result: {self.result_id} - Image paths from convert_pdf_to_png and process_document differ. Using paths from convert_pdf_to_png.")
+                 # self.png_files를 그대로 유지 (convert_pdf_to_png의 결과가 우선)
 
             self.ocr_results = json.dumps(self.all_rag_ready_data, ensure_ascii=False) if self.all_rag_ready_data else "[]"
             
             logger.info(f"Result: {self.result_id} - OCR + LLM processing completed. Consolidated items: {len(self.all_consolidated_data)}, RAG items: {len(self.all_rag_ready_data)}")
             logger.info(f"RAG items: {self.all_rag_ready_data}")
+            logger.info(f"RAG Data type: {self.all_rag_ready_data}")
             
         except Exception as e:
             logger.error(f"Result: {self.result_id} - Error in OCR + LLM processing: {str(e)}", exc_info=True)

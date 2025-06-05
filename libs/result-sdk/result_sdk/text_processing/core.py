@@ -35,24 +35,32 @@ def process_document(input_file_path: str,
                      temp_base_dir: str,
                      prompt_template: str,
                      generation_config: dict,
-                     safety_settings: list
+                     safety_settings: list,
+                     pre_converted_image_paths: list = None
                     ) -> tuple[list, list, list, str | None]:
     print(f"문서 처리 시작: {input_file_path}")
-
-    # config.settings를 통해 접근
-    unique_subfolder_name = f"{config.settings.DEFAULT_PDF_CONVERT_TEMP_SUBDIR_NAME}_{os.path.splitext(os.path.basename(input_file_path))[0]}_{uuid.uuid4().hex[:8]}"
-    current_temp_pdf_folder_for_run = os.path.join(temp_base_dir, unique_subfolder_name)
+    
     created_temp_folder_for_this_run = None
+    image_files_to_process = []
 
-    if input_file_path.lower().endswith('.pdf'):
-        image_files_to_process = get_image_paths_from_input(input_file_path, current_temp_pdf_folder_for_run)
-        if image_files_to_process:
-             created_temp_folder_for_this_run = current_temp_pdf_folder_for_run
+    if pre_converted_image_paths:
+        print(f"사전 변환된 이미지 사용: {len(pre_converted_image_paths)}개")
+        image_files_to_process = pre_converted_image_paths
+        # created_temp_folder_for_this_run은 None으로 유지 (core.py가 직접 생성한 임시 폴더가 아님)
     else:
-        image_files_to_process = get_image_paths_from_input(input_file_path, None)
+        # config.settings를 통해 접근
+        unique_subfolder_name = f"{config.settings.DEFAULT_PDF_CONVERT_TEMP_SUBDIR_NAME}_{os.path.splitext(os.path.basename(input_file_path))[0]}_{uuid.uuid4().hex[:8]}"
+        current_temp_pdf_folder_for_run = os.path.join(temp_base_dir, unique_subfolder_name)
+
+        if input_file_path.lower().endswith('.pdf'):
+            image_files_to_process = get_image_paths_from_input(input_file_path, current_temp_pdf_folder_for_run)
+            if image_files_to_process:
+                 created_temp_folder_for_this_run = current_temp_pdf_folder_for_run
+        else:
+            image_files_to_process = get_image_paths_from_input(input_file_path, None) # 이미지 파일은 temp_output_folder 불필요
 
     if not image_files_to_process:
-        print(f"'{input_file_path}'에서 처리할 이미지를 찾지 못했습니다.")
+        print(f"'{input_file_path}'에서 처리할 이미지를 찾지 못했습니다. (사전 변환 경로 포함)")
         if created_temp_folder_for_this_run and os.path.exists(created_temp_folder_for_this_run):
             try:
                 shutil.rmtree(created_temp_folder_for_this_run)
