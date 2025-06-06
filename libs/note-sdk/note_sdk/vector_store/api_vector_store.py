@@ -1,6 +1,7 @@
 import re
 import asyncio
 import json
+
 from pinecone import Pinecone
 from typing import List, Dict, Any, Literal
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -39,6 +40,9 @@ class VectorLoader:
         
         # 스레드 풀 초기화
         self.executor = ThreadPoolExecutor(max_workers=4)
+        
+        # BM25 인코더 초기화
+        self.bm25 = BM25Encoder()
         
         # 처리된 벡터 수 추적 변수
         self.processed_vectors = {
@@ -269,4 +273,85 @@ class VectorLoader:
             
         except Exception as e:
             logger.error(f"[VectorLoader] Markdown processing error: {e}")
+            return False
+
+    async def process_image(self, image_info: Dict[str, Any]) -> bool:
+        try:
+            summary = image_info.get("summary")
+            if not summary:
+                logger.error("[VectorLoader] Image summary is empty")
+                return False
+
+            chunk_id = int(image_info.get("position", 0))
+            actual_image_path = image_info.get("actual_path", "")
+
+            # 1. Dense 임베딩 생성
+            dense_embedding = await asyncio.get_event_loop().run_in_executor(
+                self.executor,
+                get_embedding,
+                summary,
+                self.language
+            )
+
+            if not dense_embedding or len(dense_embedding) == 0:
+                logger.error(f"[VectorLoader] Dense embedding generation failed for image {chunk_id}")
+                return False
+
+            # 2. Sparse 임베딩 생성
+            sparse_embedding = None
+            try:
+                # BM25 fit을 summary로 수행
+                self.bm25.fit([summary])
+                sparse_result = self.bm25.encode_documents([summary])
+                if sparse_result and len(sparse_result) > 0:
+                    sparse_embedding = sparse_result[0]
+            except Exception as e:
+                logger.error(f"[VectorLoader] Sparse embedding error for image {chunk_id}: {e}")
+                sparse_embedding = None
+
+            # 3. 메타데이터 구성
+            metadata = {
+                "spaceId": str(self.space_id),
+                "chunkId": chunk_id,
+                "type": "image",
+                "content": summary,
+                "imagePath": actual_image_path
+            }
+
+            # 4. Dense 벡터 업로드
+            vector_id = f"{str(self.space_id)}_{self.language}_{chunk_id}_image"
+            dense_vector = {
+                "id": f"{vector_id}_dense",
+                "values": dense_embedding,
+                "metadata": metadata
+            }
+            dense_task = asyncio.create_task(self.upsert_dense_vector(dense_vector))
+
+            # 5. Sparse 벡터 처리 (성공한 경우에만)
+            sparse_task = None
+            if sparse_embedding and 'indices' in sparse_embedding and 'values' in sparse_embedding and len(sparse_embedding['indices']) > 0:
+                sparse_vector = {
+                    "id": f"{vector_id}_sparse",
+                    "sparse_values": {
+                        "indices": sparse_embedding['indices'],
+                        "values": sparse_embedding['values']
+                    },
+                    "metadata": metadata
+                }
+                sparse_task = asyncio.create_task(self.upsert_sparse_vector(sparse_vector))
+
+            # 6. 병렬 실행
+            if sparse_task:
+                await asyncio.gather(dense_task, sparse_task)
+            else:
+                await dense_task
+
+            self.processed_vectors["image"]["dense"] += 1
+            if sparse_task:
+                self.processed_vectors["image"]["sparse"] += 1
+
+            return True
+
+        except Exception as e:
+            logger.error(f"[VectorLoader] Image processing error: {e}")
             return False
