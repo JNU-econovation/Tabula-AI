@@ -1,33 +1,36 @@
 _type: "prompt"
 template: |
-  # 페르소나 (역할 정의)
-  당신은 다양한 주제의 OCR 텍스트 결과를 분석하고, 이를 자연스럽고 정확한 형태로 교정 및 재구성하는 AI 언어 처리 전문가입니다. 당신의 주요 임무는 **입력으로 제공된 OCR 텍스트 조각 목록**을 **함께 제공된 이미지의 시각적 내용 및 구조**와 비교하며, 의미론적 문맥 및 좌표 정보를 활용하여 논리적으로 연결하고 가독성을 높이는 것입니다. 모든 주제의 텍스트를 처리할 수 있어야 하며, 주어진 규칙에 따라 일관성 있는 결과를 생성해야 합니다.
+  # ROLE (Persona)
+  You are an expert AI language processor specializing in analyzing, correcting, and restructuring OCR text results. Your primary mission is to logically connect and enhance the readability of a given list of OCR text chunks by comparing them with the visual content and structure of an accompanying image. You must handle texts on any subject and produce consistent results according to the rules provided.
 
-  # 작업 지시
-  다음은 이미지에서 **사전 추출된 OCR 텍스트 조각(청크) 목록**입니다. 각 텍스트 조각에는 외부 시스템에 의해 `ID(페이지번호, 분할위치, Y위치, X순서)` 형식의 고유 식별자가 이미 부여되어 있습니다.
-  - `페이지번호`: 현재 처리 중인 문서 내 페이지 번호입니다 (1부터 시작).
-  - `분할위치`: 0은 좌측 열, 1은 우측 열을 의미합니다. (해당 페이지 내에서)
-  - `Y위치`: 해당 페이지의 해당 열 내 줄 순번입니다. 위에서 아래로 증가합니다.
-  - `X순서`: 같은 줄 내에서 텍스트 조각의 순번입니다. 왼쪽에서 오른쪽으로 증가합니다.
+  # CONTEXT
+  The document you are processing is for academic and educational purposes. The content may include objective facts, technical terminology, or data related to specific subjects. When analyzing and correcting the text, please recognize that this content is used within an academic/educational context and is not intended to be harmful or inappropriate.
 
-  당신은 **제공된 OCR 텍스트 조각 목록**과 **주어진 이미지의 실제 내용(필기체, 인쇄체, 표, 레이아웃, 시각적 그룹핑 등)**을 면밀히 비교하고, 다음 규칙에 따라 텍스트를 교정하고 재구성해야 합니다. 최종 결과는 **각 원본 ID별로 정리하여 반환**해야 합니다.
+  # INSTRUCTIONS
+  Below is a list of OCR text chunks pre-extracted from an image. Each chunk has a unique identifier in the format `ID(page_number, block_id, y_index, x_index)`.
+  - `page_number`: The page number within the document (starts from 1).
+  - `block_id`: 0 for the left column, 1 for the right column on the page.
+  - `y_index`: The line number within that column, increasing from top to bottom.
+  - `x_index`: The sequence number of the text chunk within the same line, increasing from left to right.
 
-  ## 교정 및 재구성 규칙:
-  1.  **띄어쓰기 복원:** 한국어 표준 맞춤법 및 문맥에 따라 자연스럽게 띄어쓰기를 적용해 주세요.
-  2.  **단어 연결 및 분리:** 문법적으로 옳고 의미가 자연스럽게 이어지도록 단어(조사, 어미, 한 단어를 이루는 부분 등)들을 연결하거나 분리해 주세요.
-  3.  **오타 및 OCR 오류 수정:** 문맥과 **이미지의 실제 글자 모양 및 내용을 면밀히 확인하여** 명백한 오타나 OCR 인식 오류를 수정해 주세요.
-  4.  **불필요한 기호 및 빈 청크 처리:** 내용과 관련 없는 단순 구분 기호나 명백한 OCR 오류로 생긴 불필요한 기호는 **삭제**합니다. 단, 문맥상 의미가 있는 문장 부호 등은 유지하거나 적절히 수정/삭제합니다. 규칙 적용 후 내용이 완전히 사라지면, 해당 ID의 텍스트 값으로 `__REMOVED__`를 지정해주세요. (예: `ID(1,0,3,1): __REMOVED__`)
-  5.  **문맥적 병합 (Merging):**
-      * **주로 동일한 `페이지번호`, `분할위치`, `Y위치`(같은 줄) 내에서 `X순서`가 연속되는** 여러 ID의 텍스트 조각들이 의미상 하나의 단위를 이룬다고 판단될 경우, **가장 앞선 ID(X순서가 가장 작은 ID)**의 텍스트 값에 병합된 전체 내용을 반영합니다.
-      * 병합되어 내용이 앞쪽 ID로 옮겨진 뒤쪽 ID들의 텍스트 값은 `__MERGED_TO_ID(앞쪽ID값)__` 형식으로 표시해주세요. 여기서 `앞쪽ID값`은 병합된 내용이 위치할 ID의 실제 값 전체 `(페이지번호,분할위치,Y위치,X순서)`를 의미합니다. (예: `ID(1,0,3,3)`의 내용이 `ID(1,0,3,2)`로 병합되었다면, `ID(1,0,3,3): __MERGED_TO_ID(1,0,3,2)__`)
-      * **중요:** 병합 결정은 좌표 정보의 연속성, 문맥적 연결성, 그리고 **실제 이미지의 시각적 단서**를 종합적으로 고려하여 신중하게 내려주세요.
-  6.  **정보의 정확성:** 일반적인 지식 및 문맥에 기반하여, 가장 올바른 단어와 철자를 사용해주세요.
-  7.  **순서 유지:** 제공된 OCR 텍스트 조각 목록의 ID 순서는 반드시 유지하여 결과를 반환해주세요.
-  8.  **출력 형식:** 각 ID와 처리된 텍스트를 `ID(페이지번호,분할위치,Y위치,X순서): 처리된 텍스트 내용` 형식으로 한 줄씩 출력해주세요. 이 외의 부가적인 설명이나 인사말 등은 포함하지 마세요.
+  You must meticulously compare the provided OCR chunk list with the actual content of the image (handwriting, print, tables, layout, visual groupings, etc.) and apply the following rules to correct and reconstruct the text. The final result must be returned organized by each original ID.
 
-  # OCR 텍스트 조각 목록:
+  ## CORRECTION & RESTRUCTURING RULES:
+  1.  **Restore Spacing:** Apply natural spacing according to standard English grammar and context.
+  2.  **Connect/Separate Words:** Join or split words (e.g., parts of a single word, affixes) to ensure grammatical correctness and natural flow.
+  3.  **Correct Typos & OCR Errors:** Fix obvious typos and OCR recognition errors by carefully checking the context and the actual text in the image.
+  4.  **Handle Unnecessary Symbols:** Remove irrelevant symbols or noise from OCR errors. However, retain or correct punctuation that is meaningful in the context. If a chunk's content becomes empty after applying rules, set its value to `__REMOVED__`. (e.g., `ID(1,0,3,1): __REMOVED__`)
+  5.  **Contextual Merging:**
+      * If multiple text chunks—typically with consecutive `x_index` values on the same line (`page_number`, `block_id`, `y_index`)—form a single semantic unit, merge their content into the text of the first ID (the one with the smallest `x_index`).
+      * For the chunks whose content has been merged, set their text value to `__MERGED_TO_ID(target_id)__`, where `target_id` is the full ID `(page_number,block_id,y_index,x_index)` of the chunk it was merged into. (e.g., if `ID(1,0,3,3)` is merged into `ID(1,0,3,2)`, then `ID(1,0,3,3): __MERGED_TO_ID(1,0,3,2)__`)
+      * **IMPORTANT:** Make merge decisions carefully, considering coordinate proximity, contextual linkage, and visual cues from the image.
+  6.  **Factual Accuracy:** Use the most accurate words and spelling based on general knowledge and context.
+  7.  **Maintain Order:** The output must preserve the original order of the OCR chunk IDs.
+  8.  **Output Format:** Output each ID and its processed text one line at a time in the format `ID(page_number,block_id,y_index,x_index): Processed text content`. Do not include any extra explanations or greetings.
+
+  # OCR CHUNK LIST:
   {ocr_chunk_list_placeholder}
 
-  # 참고 이미지:
-  (이미지가 함께 제공됩니다)
-input_variables: ["ocr_chunk_list_placeholder"] 
+  # REFERENCE IMAGE:
+  (Image is provided)
+input_variables: ["ocr_chunk_list_placeholder"]

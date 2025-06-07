@@ -30,12 +30,28 @@ def get_llm_response(full_prompt: str, image_path: str,
     # 현재 사용 중인 모델로 유지 (또는 'gemini-1.5-flash-latest')
     model = genai.GenerativeModel('gemini-1.5-flash-latest') # 안정적인 버전으로 변경 권장
     contents = [full_prompt, img]
-    
+
+    current_safety_settings = safety_settings_list
+    if current_safety_settings is None:
+        print("  Warning: safety_settings_list is None. Applying default BLOCK_NONE settings.")
+        if hasattr(genai.types, 'HarmCategory') and hasattr(genai.types, 'HarmBlockThreshold'):
+            current_safety_settings = [
+                {"category": genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
+                {"category": genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
+                {"category": genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
+                {"category": genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
+            ]
+        else:
+            print("  Error: Cannot apply default safety settings because HarmCategory or HarmBlockThreshold is not available. LLM might use its own defaults.")
+            # 이 경우, safety_settings를 None으로 두어 LLM 기본 설정을 따르거나,
+            # 혹은 더 강력한 오류 처리를 할 수 있습니다. 여기서는 None으로 유지합니다.
+            current_safety_settings = None # 명시적으로 None으로 설정
+
     try:
         response = model.generate_content(
             contents,
             generation_config=genai.types.GenerationConfig(**generation_config_dict),
-            safety_settings=safety_settings_list
+            safety_settings=current_safety_settings
         )
 
         if not response.candidates:
