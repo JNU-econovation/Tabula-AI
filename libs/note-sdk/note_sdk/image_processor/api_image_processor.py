@@ -12,18 +12,18 @@ from tenacity import retry, stop_after_attempt, wait_exponential
 from note_sdk.llm import MultiModal, LLMs
 from note_sdk.config import settings
 from common_sdk.config import settings as common_settings
-from common_sdk.utils import get_embedding
 from common_sdk.utils import num_tokens_from_string
 from common_sdk.get_logger import get_logger
 from common_sdk.prompt_loader import PromptLoader
 from common_sdk.exceptions import ImageProcessingError
+from note_sdk.vector_store import VectorLoader
 
 # 로거 설정
 logger = get_logger()
 
 # 이미지 요약 클래스
 class ImageSummary:
-    def __init__(self, space_id: str = None):
+    def __init__(self, space_id: str = None, language: str = "korean"):
         # OpenAI 클라이언트 초기화
         self.client = OpenAI(api_key=common_settings.OPENAI_API_KEY_J)
 
@@ -58,6 +58,9 @@ class ImageSummary:
 
         # 이미지 처리 결과 저장을 위한 변수 추가
         self.processed_images = []
+
+        # VectorLoader 인스턴스
+        self.vector_loader = VectorLoader(language=language, space_id=space_id)
 
     # 이미지 크기 조정
     def resize_image(self, image_path: str, max_size: int = 1024) -> bytes:
@@ -140,20 +143,22 @@ class ImageSummary:
             summary_tokens = num_tokens_from_string(summary)
             self.total_summary_tokens += summary_tokens
             
-            # 임베딩 생성
-            embedding = get_embedding(summary, "ko")
-            
-            return {
+            # 이미지 정보 구성
+            image_data = {
                 "type": "image",
                 "full_tag": image_info["full_tag"],
                 "path": image_info["path"],
                 "actual_path": actual_image_path,
                 "alt_text": image_info["alt_text"],
                 "summary": summary,
-                "embedding": embedding,
                 "position": image_info["position"],
                 "end_position": image_info["end_position"]
             }
+
+            # VectorLoader를 통해 벡터 DB 적재
+            await self.vector_loader.process_image(image_data)
+            
+            return image_data
         
         except RateLimitError as e:
             logger.warning(f"[process_image] TPM RateLimitError occurred, waiting for 60 seconds: {str(e)}")
