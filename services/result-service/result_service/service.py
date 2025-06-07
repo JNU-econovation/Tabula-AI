@@ -429,7 +429,7 @@ class ResultService:
             raise Exception(f"하이라이트 이미지 생성 중 오류 발생: {str(e)}")
 
     async def upload_highlight_images(self):
-        """하이라이트 이미지 S3 저장"""
+        """하이라이트 이미지 S3 저장 (틀린 답이 없으면 원본 이미지 사용)"""
         try:
             logger.info(f"Result: {self.result_id} - Starting highlight images upload to S3")
             
@@ -438,57 +438,87 @@ class ResultService:
                 return
             
             highlight_dir = Path(self.png_files[0]).parent / "highlights_sdk" 
-            if not highlight_dir.exists():
-                logger.info(f"Result: {self.result_id} - No highlight directory '{highlight_dir}' found, skipping highlight upload")
-                return
+            highlight_files = []
             
-            highlight_files = list(highlight_dir.glob("page_*_visualized_*.png")) 
-            
-            if not highlight_files:
-                logger.info(f"Result: {self.result_id} - No highlight images found in '{highlight_dir}' with pattern 'page_*_visualized_*.png', skipping highlight upload")
-                return
+            # 하이라이트 이미지가 있는지 확인
+            if highlight_dir.exists():
+                highlight_files = list(highlight_dir.glob("page_*_visualized_*.png"))
             
             self.highlight_urls = []
             
-            for highlight_file in highlight_files:
-                try:
-                    filename = highlight_file.name
+            # 하이라이트 이미지가 있는 경우
+            if highlight_files:
+                logger.info(f"Result: {self.result_id} - Found {len(highlight_files)} highlight images, uploading them")
+                
+                for highlight_file in highlight_files:
                     try:
-                        page_num_str = filename.split("page_")[1].split("_")[0]
-                        page_num = int(page_num_str)
-                    except (IndexError, ValueError) as e_parse:
-                        logger.error(f"Result: {self.result_id} - Error parsing page number from filename '{filename}': {e_parse}. Skipping this file.")
-                        continue
+                        filename = highlight_file.name
+                        try:
+                            page_num_str = filename.split("page_")[1].split("_")[0]
+                            page_num = int(page_num_str)
+                        except (IndexError, ValueError) as e_parse:
+                            logger.error(f"Result: {self.result_id} - Error parsing page number from filename '{filename}': {e_parse}. Skipping this file.")
+                            continue
+                            
+                        s3_result = self.s3_storage.upload_post_image(
+                            file_path=str(highlight_file),
+                            user_id=self.user_id,
+                            space_id=self.space_id,
+                            result_id=self.result_id,
+                            page=page_num
+                        )
                         
-                    s3_result = self.s3_storage.upload_post_image(
-                        file_path=str(highlight_file),
-                        user_id=self.user_id,
-                        space_id=self.space_id,
-                        result_id=self.result_id,
-                        page=page_num
-                    )
-                    
-                    highlight_data = {
-                        "id": page_num,
-                        "s3_key": s3_result["s3_key"],
-                        "bucket": s3_result["bucket"],
-                        "url": s3_result["url"]
-                    }
-                    self.highlight_urls.append(highlight_data)
-                    
-                    logger.info(f"Result: {self.result_id} - Highlight image uploaded to S3: page {page_num} -> {s3_result['s3_key']}")
-                    
-                except ValueError as e:
-                    logger.error(f"Result: {self.result_id} - Error parsing page number from {filename}: {str(e)}")
-                    continue
-                except Exception as e:
-                    logger.error(f"Result: {self.result_id} - Error uploading highlight image {filename}: {str(e)}")
-                    continue
+                        highlight_data = {
+                            "id": page_num,
+                            "s3_key": s3_result["s3_key"],
+                            "bucket": s3_result["bucket"],
+                            "url": s3_result["url"]
+                        }
+                        self.highlight_urls.append(highlight_data)
+                        
+                        logger.info(f"Result: {self.result_id} - Highlight image uploaded to S3: page {page_num} -> {s3_result['s3_key']}")
+                        
+                    except ValueError as e:
+                        logger.error(f"Result: {self.result_id} - Error parsing page number from {filename}: {str(e)}")
+                        continue
+                    except Exception as e:
+                        logger.error(f"Result: {self.result_id} - Error uploading highlight image {filename}: {str(e)}")
+                        continue
             
-            logger.info(f"Result: {self.result_id} - All highlight images uploaded successfully. Total: {len(self.highlight_urls)} files")
+            # 하이라이트 이미지가 없는 경우 (틀린 답이 없는 경우) 원본 이미지를 post로 업로드
+            else:
+                logger.info(f"Result: {self.result_id} - No highlight images found, uploading original images as post images")
+                
+                for i, png_file_path in enumerate(self.png_files):
+                    try:
+                        page_num = i + 1  # 페이지 번호 (1부터 시작)
+                        
+                        s3_result = self.s3_storage.upload_post_image(
+                            file_path=png_file_path,
+                            user_id=self.user_id,
+                            space_id=self.space_id,
+                            result_id=self.result_id,
+                            page=page_num
+                        )
+                        
+                        highlight_data = {
+                            "id": page_num,
+                            "s3_key": s3_result["s3_key"],
+                            "bucket": s3_result["bucket"],
+                            "url": s3_result["url"]
+                        }
+                        self.highlight_urls.append(highlight_data)
+                        
+                        logger.info(f"Result: {self.result_id} - Original image uploaded as post image to S3: page {page_num} -> {s3_result['s3_key']}")
+                        
+                    except Exception as e:
+                        logger.error(f"Result: {self.result_id} - Error uploading original image as post image {png_file_path}: {str(e)}")
+                        continue
+            
+            logger.info(f"Result: {self.result_id} - All post images uploaded successfully. Total: {len(self.highlight_urls)} files")
             
         except Exception as e:
-            logger.error(f"Result: {self.result_id} - Error uploading highlight images to S3: {str(e)}")
+            logger.error(f"Result: {self.result_id} - Error uploading post images to S3: {str(e)}")
             raise Exception(f"S3 하이라이트 이미지 업로드 중 오류 발생: {str(e)}")
     
     def update_post_image_urls(self):
