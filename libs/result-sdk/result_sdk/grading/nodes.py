@@ -1,9 +1,7 @@
-# nodes.py
-
+import time
 import json
 import asyncio
-from typing import List, Any, Tuple
-from pinecone_text.sparse import BM25Encoder
+from typing import List, Any, Tuple, Optional
 from openai import OpenAI
 
 from .models import GraphState, PageResult, WrongAnswer, GradingConfig
@@ -57,20 +55,20 @@ class GradingNodes:
         
         return state
 
-    def initialization_node(self, state: GraphState) -> GraphState:
-        """초기화 노드"""
-        # DocumentFinder 초기화 (동적 언어 설정)
+    async def initialization_node(self, state: GraphState) -> GraphState:
+        """초기화 노드 (비동기)"""
+        # DocumentFinder 초기화
         document_finder = DocumentFinder(language=state["lang_type"])
         
-        # BM25 설정 (새로운 방식)
-        document_finder.setup_bm25(state["all_texts"])
+        # BM25 설정 (비동기 방식)
+        await document_finder.setup_bm25(state["all_texts"])
         
         state["document_finder"] = document_finder
         
         return state
     
     async def process_page_node(self, state: GraphState) -> GraphState:
-        """페이지 처리 노드"""
+        """페이지 처리 노드 - 개선된 버전"""
         if state["page_processes_pending"]:
             return state
         
@@ -84,10 +82,10 @@ class GradingNodes:
                 space_id=state["space_id"],
                 prompt_template=state["prompt_template"],
                 document_finder=state["document_finder"],
-                lang_type=state["lang_type"]  # 언어 타입 전달
+                lang_type=state["lang_type"]
             )
             page_tasks.append(task)
-        
+
         logger.info(f"총 {len(page_tasks)}개 페이지 병렬 처리 시작")
         state["page_results"] = await asyncio.gather(*page_tasks)
         
@@ -121,80 +119,125 @@ class GradingNodes:
         key_index = min(key_index, len(self.config.openai_api_keys) - 1)
         return OpenAI(api_key=self.config.openai_api_keys[key_index])
     
-    async def _grade_entry(
-            self,
-            entry: Any,
-            space_id: str,
-            prompt_template: str,
-            page_number: int,
-            document_finder: DocumentFinder,
-            lang_type: str
-        ) -> Tuple[List[int], str, str]:
-            """개별 항목 채점"""
-            key = entry[0]
-            text = entry[1][0] if entry[1] else ""
+    async def _find_reference_text(
+        self,
+        text: str,
+        space_id: str,
+        document_finder: DocumentFinder,
+        lang_type: str
+    ) -> Optional[str]:
+        """Pinecone에서 참고 텍스트 검색 (비동기)"""
+        try:
+            # 검색 설정
+            retrieval_config = RetrievalConfig(space_id=space_id)
             
-            words = text.split()
-            if len(words) <= 1:
-                return key, None, None
-            
-            # 검색 설정 (space_id 사용)
-            retrieval_config = RetrievalConfig(
-                space_id=space_id
-            )
-            
-            # 참고 텍스트 검색 (동적 언어 설정)
-            correct_text = document_finder.find_reference_text(
+            # 참고 텍스트 검색
+            correct_text = await document_finder.find_reference_text(
                 query=text,
                 config=retrieval_config,
-                language=lang_type  # 파라미터로 받은 언어 사용
+                language=lang_type
             )
             
-            if not correct_text:
-                return key, None, None
-            
+            return correct_text
+        except Exception as e:
+            logger.error(f"Pinecone 조회 중 오류: {str(e)}")
+            return None
+    
+    async def _grade_with_openai(
+        self,
+        text: str,
+        correct_text: str,
+        prompt_template: str,
+        page_number: int
+    ) -> Tuple[Optional[str], Optional[str]]:
+        """OpenAI로 채점 수행"""
+        try:
             prompt = prompt_template.format(
                 reference_text=correct_text,
                 user_text=text
             )
             
+            client = self._get_openai_client(page_number)
+            
+            response = await asyncio.to_thread(
+                client.chat.completions.create,
+                model=self.config.model_name,
+                messages=[{"role": "system", "content": prompt}],
+                temperature=self.config.temperature,
+                max_tokens=self.config.max_tokens,
+                response_format={"type": "json_object"}
+            )
+            
+            content = response.choices[0].message.content
+            
             try:
-                client = self._get_openai_client(page_number)
-                response = await asyncio.to_thread(
-                    client.chat.completions.create,
-                    model=self.config.model_name,
-                    messages=[{"role": "system", "content": prompt}],
-                    temperature=self.config.temperature,
-                    max_tokens=self.config.max_tokens,
-                    response_format={"type": "json_object"}
-                )
+                json_start = content.find('{')
+                json_end = content.rfind('}') + 1
                 
-                content = response.choices[0].message.content
-                
-                try:
-                    json_start = content.find('{')
-                    json_end = content.rfind('}') + 1
+                if json_start >= 0 and json_end > json_start:
+                    json_content = content[json_start:json_end]
+                    result = json.loads(json_content)
                     
-                    if json_start >= 0 and json_end > json_start:
-                        json_content = content[json_start:json_end]
-                        result = json.loads(json_content)
-                        
-                        is_wrong = result.get("is_wrong", False)
-                        
-                        if is_wrong:
-                            feedback = result.get("feedback")
-                            if feedback:
-                                return key, text, feedback
-                            else:
-                                return key, None, None
-                        else:
-                            return key, None, None
+                    is_wrong = result.get("is_wrong", False)
+                    
+                    if is_wrong:
+                        feedback = result.get("feedback")
+                        return text, feedback
                     else:
-                        return key, None, None
-                except Exception as e:
-                    return key, None, None
+                        return None, None
+                else:
+                    return None, None
             except Exception as e:
-                return key, None, None
+                return None, None
+                
+        except Exception as e:
+            logger.error(f"OpenAI 호출 중 오류: {str(e)}")
+            return None, None
+    
+    async def _process_entry(
+        self,
+        entry: Any,
+        space_id: str,
+        prompt_template: str,
+        page_number: int,
+        document_finder: DocumentFinder,
+        lang_type: str
+    ) -> Tuple[List[int], Optional[str], Optional[str]]:
+        """개별 항목 최적화된 처리 - Pinecone 조회 후 바로 OpenAI 호출"""
+        key = entry[0]
+        text = entry[1][0] if entry[1] else ""
+        
+        words = text.split()
+        if len(words) <= 1:
+            return key, None, None
+        
+        # Pinecone 조회
+        pinecone_start = time.time()
+        correct_text = await self._find_reference_text(
+            text=text,
+            space_id=space_id,
+            document_finder=document_finder,
+            lang_type=lang_type
+        )
+        pinecone_duration = time.time() - pinecone_start
+        logger.info(f"[TIME] [페이지 {page_number}] Pinecone 조회 시간: {pinecone_duration:.3f}초")
+        
+        # Pinecone에서 결과를 찾지 못한 경우
+        if not correct_text:
+            return key, None, None
+        
+        # 참고 텍스트를 찾은 즉시 OpenAI 호출
+        openai_start = time.time()
+        original_text, feedback = await self._grade_with_openai(
+            text=text,
+            correct_text=correct_text,
+            prompt_template=prompt_template,
+            page_number=page_number
+        )
+        openai_duration = time.time() - openai_start
+        logger.info(f"[TIME] [페이지 {page_number}] OpenAI API 호출 시간: {openai_duration:.3f}초")
+        
+        return key, original_text, feedback
         
     async def _async_process_page(
         self,
@@ -205,12 +248,14 @@ class GradingNodes:
         document_finder: DocumentFinder,
         lang_type: str
     ) -> Tuple[int, List[WrongAnswer]]:
-        """페이지별 비동기 처리"""
+        """페이지별 최적화된 비동기 처리 - 진정한 병렬 + 순차 조합"""
+        page_start = time.time()
         logger.info(f"[페이지 {page_number}] 채점 중... (API 키 {1 if page_number % 2 == 1 else 2} 사용)")
         
+        # 각 entry별로 Pinecone → OpenAI 순차 처리를 병렬로 실행
         tasks = []
         for entry in page_entries:
-            task = self._grade_entry(
+            task = self._process_entry(
                 entry=entry,
                 space_id=space_id,
                 prompt_template=prompt_template,
@@ -222,6 +267,7 @@ class GradingNodes:
         
         results = await asyncio.gather(*tasks)
         
+        # 결과 정리
         wrong_answers = []
         for key, original_text, feedback in results:
             if original_text and feedback:
@@ -231,6 +277,8 @@ class GradingNodes:
                     feedback=feedback
                 ))
         
+        page_duration = time.time() - page_start
         logger.info(f"[페이지 {page_number}] 채점 완료: {len(wrong_answers)}개 틀림")
-        
+        logger.info(f"[TIME] 채점 총 소요시간: {page_duration:.3f}초")
+
         return page_number, wrong_answers
