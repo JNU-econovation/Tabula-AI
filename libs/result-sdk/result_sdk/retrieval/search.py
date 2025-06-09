@@ -1,4 +1,6 @@
+# retrieval/search.py
 import json
+import asyncio
 from typing import List, Optional, Dict, Any
 from pinecone import Pinecone
 from pinecone_text.sparse import BM25Encoder
@@ -10,7 +12,7 @@ from ..config import settings
 logger = get_logger()
 
 class PineconeSearcher:
-    """Pinecone을 사용한 벡터 검색 클래스"""
+    """Pinecone을 사용한 벡터 검색 클래스 (비동기 지원)"""
     
     def __init__(self, language: str = "korean"):
         self.api_key = settings.PINECONE_API_KEY
@@ -83,21 +85,22 @@ class PineconeSearcher:
             self.logger.error(f"Failed to get index info: {str(e)}")
             return None
     
-    def dense_search(self, 
+    async def dense_search(self, 
         query: str, 
         config: RetrievalConfig,
         language: str = "korean"
     ) -> List[SearchResult]:
-        """Dense 벡터 검색 수행"""
+        """Dense 벡터 검색 수행 (비동기)"""
         try:
             # Dense 벡터 생성
-            dense_vector = get_embedding(query, language=language)
+            dense_vector = await asyncio.to_thread(get_embedding, query, language=language)
             
             # Dense 인덱스에서 검색
             dense_index = self.get_dense_index()
             filter_dict = {"spaceId": config.space_id}
             
-            results = dense_index.query(
+            results = await asyncio.to_thread(
+                dense_index.query,
                 vector=dense_vector,
                 top_k=config.top_k,
                 include_metadata=True,
@@ -109,7 +112,7 @@ class PineconeSearcher:
             search_results = []
             if results and results.matches:
                 for match in results.matches:
-                    enhanced_content = self.enhance_content_with_images(
+                    enhanced_content = await self.enhance_content_with_images(
                         match.metadata.get("content", ""),
                         match.metadata,
                         config.space_id
@@ -126,15 +129,19 @@ class PineconeSearcher:
             self.logger.error(f"Dense search error: {str(e)}")
             return []
     
-    def sparse_search(self, 
+    async def sparse_search(self, 
         query: str, 
         config: RetrievalConfig,
         bm25_encoder: BM25Encoder
     ) -> List[SearchResult]:
-        """Sparse 벡터 검색 수행"""
+        """Sparse 벡터 검색 수행 (비동기)"""
         try:
             # Sparse 벡터 생성
-            sparse_vector = bm25_encoder.encode_queries([query])[0]
+            sparse_vector = await asyncio.to_thread(
+                bm25_encoder.encode_queries, 
+                [query]
+            )
+            sparse_vector = sparse_vector[0]
             
             # Sparse 인덱스에서 검색
             sparse_index = self.get_sparse_index()
@@ -146,7 +153,8 @@ class PineconeSearcher:
                 "values": sparse_vector['values']
             }
             
-            results = sparse_index.query(
+            results = await asyncio.to_thread(
+                sparse_index.query,
                 sparse_vector=sparse_values,
                 top_k=config.top_k,
                 include_metadata=True,
@@ -158,7 +166,7 @@ class PineconeSearcher:
             search_results = []
             if results and results.matches:
                 for match in results.matches:
-                    enhanced_content = self.enhance_content_with_images(
+                    enhanced_content = await self.enhance_content_with_images(
                         match.metadata.get("content", ""),
                         match.metadata,
                         config.space_id
@@ -175,17 +183,19 @@ class PineconeSearcher:
             self.logger.error(f"Sparse search error: {str(e)}")
             return []
     
-    def hybrid_search(self, 
+    async def hybrid_search(self, 
         query: str, 
         config: RetrievalConfig,
         bm25_encoder: BM25Encoder,
         language: str = "korean"
     ) -> HybridSearchResponse:
-        """하이브리드 검색 (Dense + Sparse) 수행"""
+        """하이브리드 검색 (Dense + Sparse) 수행 (비동기)"""
         try:
-            # Dense와 Sparse 검색을 별도로 수행
-            dense_results = self.dense_search(query, config, language)
-            sparse_results = self.sparse_search(query, config, bm25_encoder)
+            # Dense와 Sparse 검색 병렬로 수행
+            dense_results, sparse_results = await asyncio.gather(
+                self.dense_search(query, config, language),
+                self.sparse_search(query, config, bm25_encoder)
+            )
             
             # 결과 합치기 및 가중치 적용
             combined_results = self.combine_results(
@@ -216,24 +226,24 @@ class PineconeSearcher:
             # ID별로 결과 정리
             combined_scores = {}
             
-            # Dense 결과 처리 (alpha 가중치 적용)
+            # Dense 결과 처리
             for result in dense_results:
                 result_id = self.get_result_id(result.metadata)
                 combined_scores[result_id] = {
-                    'content': result.content,  # 이미 enhance된 콘텐츠
+                    'content': result.content,
                     'metadata': result.metadata,
                     'dense_score': result.score * alpha,
                     'sparse_score': 0.0
                 }
             
-            # Sparse 결과 처리 ((1-alpha) 가중치 적용)
+            # Sparse 결과 처리
             for result in sparse_results:
                 result_id = self.get_result_id(result.metadata)
                 if result_id in combined_scores:
                     combined_scores[result_id]['sparse_score'] = result.score * (1 - alpha)
                 else:
                     combined_scores[result_id] = {
-                        'content': result.content,  # 이미 enhance된 콘텐츠
+                        'content': result.content,
                         'metadata': result.metadata,
                         'dense_score': 0.0,
                         'sparse_score': result.score * (1 - alpha)
@@ -265,8 +275,8 @@ class PineconeSearcher:
         content_type = metadata.get('type', '')
         return f"{space_id}_{chunk_id}_{content_type}"
     
-    def enhance_content_with_images(self, text_content: str, metadata: Dict[str, Any], space_id: str) -> str:
-        """텍스트 콘텐츠에 관련 이미지 설명 추가"""
+    async def enhance_content_with_images(self, text_content: str, metadata: Dict[str, Any], space_id: str) -> str:
+        """텍스트 콘텐츠에 관련 이미지 설명 추가 (비동기)"""
         try:
             # imageReferences가 있는지 확인
             image_references_str = metadata.get('imageReferences', '')
@@ -274,27 +284,32 @@ class PineconeSearcher:
             if not image_references_str:
                 return text_content
             
-            # JSON 문자열을 파싱하여 리스트로 변환
+            # JSON 문자열 파싱하여 리스트로 변환
             try:
                 image_references = json.loads(image_references_str)
             except (json.JSONDecodeError, TypeError):
                 self.logger.error(f"Failed to parse imageReferences JSON: {image_references_str}")
                 return text_content
             
-            # 이미지 콘텐츠 조회
-            image_contents = []
+            # 이미지 콘텐츠 조회 (병렬로 처리)
+            image_tasks = []
             for image_ref in image_references:
-                # image_ref는 {"imagePath": "경로"} 형태의 딕셔너리
+
                 if isinstance(image_ref, dict) and 'imagePath' in image_ref:
                     image_path = image_ref['imagePath']
-                    image_content = self.get_image_content(image_path, space_id)
-                    if image_content:
-                        image_contents.append(f"[이미지 설명: {image_content}]")
+                    task = self.get_image_content(image_path, space_id)
+                    image_tasks.append(task)
                 elif isinstance(image_ref, str):
-                    # 혹시 문자열로 저장된 경우도 처리
-                    image_content = self.get_image_content(image_ref, space_id)
-                    if image_content:
-                        image_contents.append(f"[이미지 설명: {image_content}]")
+                    # 문자열로 저장된 경우도 처리
+                    task = self.get_image_content(image_ref, space_id)
+                    image_tasks.append(task)
+            
+            # 모든 이미지 콘텐츠를 병렬로 조회
+            if image_tasks:
+                image_contents_raw = await asyncio.gather(*image_tasks)
+                image_contents = [f"[이미지 설명: {content}]" for content in image_contents_raw if content]
+            else:
+                image_contents = []
             
             # 텍스트 콘텐츠와 이미지 설명 결합
             if image_contents:
@@ -307,13 +322,13 @@ class PineconeSearcher:
             self.logger.error(f"Error enhancing content with images: {str(e)}")
             return text_content
     
-    def get_image_content(self, image_path: str, space_id: str) -> Optional[str]:
-        """특정 이미지 경로에 해당하는 이미지 콘텐츠 조회"""
+    async def get_image_content(self, image_path: str, space_id: str) -> Optional[str]:
+        """특정 이미지 경로에 해당하는 이미지 콘텐츠 조회 (비동기)"""
         try:
             # Dense 인덱스에서 이미지 타입 검색
             dense_index = self.get_dense_index()
             
-            # 이미지 타입이고 해당 imagePath를 가진 벡터 검색
+            # metadata가 이미지 타입 + 해당 imagePath를 가진 벡터 검색
             filter_dict = {
                 "spaceId": space_id,
                 "type": "image",
@@ -323,7 +338,8 @@ class PineconeSearcher:
             # Dense 차원에 맞는 더미 벡터 생성
             dummy_vector = [0.0] * self.dense_vector_dimension
             
-            results = dense_index.query(
+            results = await asyncio.to_thread(
+                dense_index.query,
                 vector=dummy_vector,  # 언어별 Dense 차원 사용
                 top_k=1,
                 include_metadata=True,
@@ -349,19 +365,19 @@ class BM25Manager:
         self.encoder = BM25Encoder()
         self.logger = get_logger()
     
-    def fit(self, texts: List[str]) -> None:
-        """텍스트 리스트로 BM25 인코더 훈련"""
+    async def fit(self, texts: List[str]) -> None:
+        """텍스트 리스트로 BM25 인코더 훈련 (비동기)"""
         try:
-            self.encoder.fit(texts)
+            await asyncio.to_thread(self.encoder.fit, texts)
             self.logger.info(f"BM25 encoder fitted with {len(texts)} texts")
         except Exception as e:
             self.logger.error(f"BM25 encoder fit error: {str(e)}")
             raise
     
-    def encode_queries(self, queries: List[str]) -> List:
-        """쿼리 리스트를 sparse 벡터로 인코딩"""
+    async def encode_queries(self, queries: List[str]) -> List:
+        """쿼리 리스트를 sparse 벡터로 인코딩 (비동기)"""
         try:
-            return self.encoder.encode_queries(queries)
+            return await asyncio.to_thread(self.encoder.encode_queries, queries)
         except Exception as e:
             self.logger.error(f"BM25 encode queries error: {str(e)}")
             raise
@@ -371,26 +387,26 @@ class BM25Manager:
         return self.encoder
     
 class DocumentFinder:
-    """문서 검색을 위한 통합 클래스"""
+    """문서 검색을 위한 통합 클래스 (비동기 지원)"""
     
     def __init__(self, language: str = "korean"):
         self.pinecone_searcher = PineconeSearcher(language)
         self.bm25_manager = BM25Manager()
         self.logger = get_logger()
     
-    def setup_bm25(self, texts: List[str]) -> None:
-        """BM25 인코더 초기화"""
-        self.bm25_manager.fit(texts)
+    async def setup_bm25(self, texts: List[str]) -> None:
+        """BM25 인코더 초기화 (비동기)"""
+        await self.bm25_manager.fit(texts)
     
-    def find_reference_text(
+    async def find_reference_text(
         self, 
         query: str, 
         config: RetrievalConfig,
         language: str = "korean"
     ) -> Optional[str]:
-        """참고 텍스트 검색"""
+        """참고 텍스트 검색 (비동기)"""
         try:
-            response = self.pinecone_searcher.hybrid_search(
+            response = await self.pinecone_searcher.hybrid_search(
                 query=query,
                 config=config,
                 bm25_encoder=self.bm25_manager.get_encoder(),

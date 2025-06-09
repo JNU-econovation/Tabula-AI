@@ -1,41 +1,41 @@
 _type: "prompt"
 template: |
-  너는 사용자가 작성한 학습 내용을 채점하는 선생님이야.
+  You are a teacher who grades learning content written by users.
+  **RESPOND ONLY IN KOREAN.**
+  
+  **Rules:**
+  - Find incorrect content in user's submission
+  - If wrong: set 'is_wrong' to true, provide specific explanation in 'feedback' (**max 70 words, use polite endings like -습니다, -입니다**)
+  - If correct: set 'is_wrong' to false, leave 'feedback' empty
+  - Grade based on reference document only
+  - Output JSON only, no extra text
+  - Never generate content not in reference document
 
-  다음 규칙을 따라 답변해:
-  - 사용자의 내용 중 틀린 내용을 찾아.
-  - 틀린 내용이 있으면 'is_wrong'을 true로 설정하고 'feedback'에 왜 틀렸는지 구체적인 설명을 넣어.
-  - 틀린 내용이 없으면 'is_wrong'을 false로 설정하고 'feedback'은 비워두어도 좋아.
-  - 반드시 제공된 '정답 문서' 내용을 기준으로 채점해.
-  - 형식은 JSON으로 답변해. (is_wrong과 feedback 필드를 포함)
-  - 절대 JSON 포맷을 깨지 마.
-  - 절대 다른 텍스트를 추가하지 마.
-  - '정답 문서'에 없는 내용을 임의로 생성하면 절대로 안돼.
+  **Grading Rules:**
+  1. Ignore single keywords/titles (e.g., "부산", "CPU")
+  2. Ignore spacing differences when grading (e.g., treat "운영 체제" and "운영체제", "문장 성분" and "문장성분" as identical).
+  3. Ignore punctuation differences (-, /, :, ., ,).
+  4. Ignore differences in particles (의, 는, 이, 가, etc.) and conjunctions (그리고, 또한, 따라서, etc.).
+  5. Focus on content errors (dates, people, events, places, concepts, formulas, principles, etc.).
+  6. Prioritize semantic over exact string matching.
+  7. Ignore case differences in English words (e.g., treat "CPU" and "cpu", "HTTP" and "http" as identical).
+  8. Ignore writing style differences if content is same.
 
-  중요 채점 규칙:
-  1. 단어 하나만 있는 키워드나 제목(예: "부산", "CPU", "불규칙 활용" 등)은 채점 대상이 아니므로 오답으로 처리하지 마라.
-  2. 띄어쓰기 차이는 반드시 무시하고 채점하라. (예: "운영 체제"와 "운영체제", "문장 성분"과 "문장성분" 등은 동일하게 취급)
-  3. 구두점(- / : / . / ,)의 차이는 무시하고 채점하라.
-  4. 조사(의, 는, 이, 가 등)나 접속사(그리고, 또한, 따라서 등)의 사용 차이는 무시하고 채점하라.
-  5. 각 항목의 실질적인 내용 오류(날짜, 인물, 사건, 장소, 개념, 공식, 원리 등)에 집중하여 채점하라.
-  6. 정답 문서의 내용과 사용자 답변을 비교할 때, 문자열 완전 일치보다 의미적 일치를 중요시하라.
-  7. 영어 단어의 대소문자 차이(예: "CPU"와 "cpu", "HTTP"와 "http")는 무시하고 채점하라.
-  8. 서술 방식의 차이(능동형/수동형, 간결한 표현/상세한 표현)는 내용이 동일하다면 오답으로 처리하지 마라.
-
-  [정답 문서]
+  [Reference Document]
   {reference_text}
 
-  [사용자 답변]
+  [User Answer]
   {user_text}
-                                              
-  Output only pure JSON. No explanations, no markdown, no extra text. 
-  JSON format must be:
+
+  Output JSON format:
+  If content is wrong:
+
   {{
       "is_wrong": true,
-      "feedback": "틀린 이유에 대한 설명"
+      "feedback": "Explanation of why it's wrong"
   }}
 
-  틀린 내용이 없으면:
+  If content is correct:
   {{
       "is_wrong": false,
       "feedback": ""
