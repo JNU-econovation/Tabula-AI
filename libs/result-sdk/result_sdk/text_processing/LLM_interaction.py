@@ -28,7 +28,7 @@ def get_llm_response(full_prompt: str, image_path: str,
     
     # 모델 이름은 필요에 따라 config 등에서 관리하거나 직접 지정할 수 있습니다.
     # 현재 사용 중인 모델로 유지 (또는 'gemini-1.5-flash-latest')
-    model = genai.GenerativeModel('gemini-1.5-flash-latest') # 안정적인 버전으로 변경 권장
+    model = genai.GenerativeModel('gemini-2.5-flash-preview-05-20') # 안정적인 버전으로 변경 권장
     contents = [full_prompt, img]
 
     current_safety_settings = safety_settings_list

@@ -115,7 +115,7 @@ class ResultService:
             for highlight_data in self.highlight_urls:
                 results_array.append({
                     "id": highlight_data.get("id"),
-                    "resultImageUrl": highlight_data.get("url", "")
+                    "postImageUrl": highlight_data.get("url", "")
                 })
 
             results_array.sort(key=lambda x: x["id"])
