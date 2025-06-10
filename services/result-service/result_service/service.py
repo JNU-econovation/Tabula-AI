@@ -272,7 +272,9 @@ class ResultService:
                 logger.error(f"Result: {self.result_id} - Failed to load OCR-PROMPT via PromptLoader: {e_prompt}", exc_info=True)
                 loaded_prompt_template = "Error loading prompt. OCR Data: {ocr_chunk_list_placeholder}"
 
-            processed_data = process_document(
+            # process_document를 별도 스레드에서 실행하여 비동기 처리
+            processed_data_tuple = await asyncio.to_thread(
+                process_document,
                 input_file_path=input_for_processing,
                 service_account_file=result_sdk_settings.SERVICE_ACCOUNT_FILE,
                 temp_base_dir=result_sdk_settings.BASE_TEMP_DIR,
@@ -282,7 +284,7 @@ class ResultService:
                 pre_converted_image_paths=self.png_files # 이미 변환된 PNG 파일 경로 전달
             )
             
-            self.all_consolidated_data, self.all_rag_ready_data, image_files_actually_used, _ = processed_data
+            self.all_consolidated_data, self.all_rag_ready_data, image_files_actually_used, _ = processed_data_tuple
 
             if image_files_actually_used and not self.png_files:
                 logger.warning(f"Result: {self.result_id} - self.png_files was empty but process_document returned image paths. This is unexpected.")
