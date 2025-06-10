@@ -71,7 +71,8 @@ class Settings:
         self.APP_ENV = os.getenv("APP_ENV", "development").lower()
         self.GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
         self.SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE_PATH")
-        self.LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-1.5-flash-latest")
+        # LLM 모델 이름을 config.py에서 직접 관리 (사용자 요청)
+        self.LLM_MODEL_NAME = "gemini-2.5-flash-preview-05-20" 
 
         # Path configurations based on APP_ENV
         # Using RESULT_SDK_ROOT as the base for development paths.
@@ -101,7 +102,7 @@ class Settings:
 
         self.GENERATION_CONFIG = {
             "temperature": 0.2,
-            "max_output_tokens": 8192  # Gemini 1.5 Flash max
+            #"max_output_tokens": 8192  # Gemini 1.5 Flash max
         }
 
         if HarmCategory and HarmBlockThreshold:

@@ -3,6 +3,7 @@
 import re
 import google.generativeai as genai
 from PIL import Image
+from result_sdk.config import settings # 설정 가져오기
 # PROMPT_TEMPLATE will be passed as an argument
 
 # 이 함수는 OCR 결과를 LLM 프롬프트의 일부로 변환합니다.
@@ -26,9 +27,10 @@ def get_llm_response(full_prompt: str, image_path: str,
     except Exception as e:
         return f"{ERROR_PREFIX}Error opening image: {str(e)}"
     
-    # 모델 이름은 필요에 따라 config 등에서 관리하거나 직접 지정할 수 있습니다.
-    # 현재 사용 중인 모델로 유지 (또는 'gemini-1.5-flash-latest')
-    model = genai.GenerativeModel('gemini-2.5-flash-preview-05-20') # 안정적인 버전으로 변경 권장
+    # 모델 이름은 config.py의 설정을 사용합니다.
+    model_name_to_use = settings.LLM_MODEL_NAME
+    print(f"  Using LLM Model: {model_name_to_use}") # 사용될 모델 이름 로깅
+    model = genai.GenerativeModel(model_name_to_use)
     contents = [full_prompt, img]
 
     current_safety_settings = safety_settings_list
@@ -89,38 +91,111 @@ def get_llm_response(full_prompt: str, image_path: str,
             
         print(f"  LLM Candidate Finish Reason: {finish_reason_name_str} (Value: {finish_reason_value})")
 
-        # FinishReason 값에 따른 처리 (숫자 값으로 비교)
-        # (참고: genai.types.FinishReason.SAFETY.value 는 3, .MAX_TOKENS.value는 2, .STOP.value는 1 - 라이브러리 버전에 따라 확인 필요)
-        # 사용자 로그에서는 2가 SAFETY로 나왔으므로, 해당 값을 기준으로 함
-        OBSERVED_FINISH_REASON_SAFETY_INT = 2 
-        OBSERVED_FINISH_REASON_STOP_INT = 1 
-        OBSERVED_FINISH_REASON_MAX_TOKENS_INT = -1 # 이전 로그에서 MAX_TOKENS는 관찰되지 않음, 임의의 값. 실제로는 2
+        # Determine actual enum values for comparison
+        actual_fr_safety, actual_fr_max_tokens, actual_fr_stop = None, None, None
+        if can_use_finish_reason_enum:
+            try:
+                actual_fr_safety = genai.types.FinishReason.SAFETY.value
+                actual_fr_max_tokens = genai.types.FinishReason.MAX_TOKENS.value
+                actual_fr_stop = genai.types.FinishReason.STOP.value
+            except AttributeError:
+                print("  Warning: Could not access specific FinishReason enum values (SAFETY, MAX_TOKENS, STOP). Falling back to integer comparison if values are known.")
+                # Fallback to known integer values if direct enum access fails after all
+                actual_fr_stop = 1
+                actual_fr_max_tokens = 2
+                actual_fr_safety = 3 
+        else: # Fallback if enum itself is not available
+            print("  Info: Using fallback integer values for FinishReason comparison (STOP=1, MAX_TOKENS=2, SAFETY=3).")
+            actual_fr_stop = 1
+            actual_fr_max_tokens = 2
+            actual_fr_safety = 3
 
-        if finish_reason_value == OBSERVED_FINISH_REASON_SAFETY_INT:
-            feedback_info = "Not available"
-            if response.prompt_feedback:
-                block_reason_str = str(response.prompt_feedback.block_reason) if hasattr(response.prompt_feedback, 'block_reason') and response.prompt_feedback.block_reason else "N/A"
-                safety_ratings_str = str(response.prompt_feedback.safety_ratings) if hasattr(response.prompt_feedback, 'safety_ratings') and response.prompt_feedback.safety_ratings else "N/A"
-                feedback_info = f"Block Reason: {block_reason_str}, Safety Ratings: {safety_ratings_str}"
-            # print(f"  LLM Error: Content blocked due to safety settings (Finish Reason Value: {finish_reason_value}). Feedback: {feedback_info}")
-            return f"{ERROR_PREFIX}Content blocked by safety settings. Finish Reason: {finish_reason_name_str} ({finish_reason_value}). Feedback: {feedback_info}"
+        if actual_fr_safety is not None and finish_reason_value == actual_fr_safety:
+            detailed_feedback = _format_prompt_feedback(response.prompt_feedback if hasattr(response, 'prompt_feedback') else None)
+            return f"{ERROR_PREFIX}Content blocked by safety settings. Finish Reason: {finish_reason_name_str} ({finish_reason_value}). Detailed Feedback: {detailed_feedback}"
         
-        # 응답에 유효한 텍스트 Part가 있는지 확인
-        if not candidate.content or not candidate.content.parts:
-            return f"{ERROR_PREFIX}No valid content part in LLM response. Finish reason: {finish_reason_name_str} ({finish_reason_value})"
-        
-        try:
-            return response.text # 성공적인 경우
-        except Exception as e_text: # response.text 접근 시 발생할 수 있는 추가 오류 (예: 라이브러리 내부 오류)
-            # print(f"  LLM Error: Failed to access response.text. Finish Reason: {finish_reason_name_str}, Error: {e_text}")
-            return f"{ERROR_PREFIX}Failed to extract text from LLM response. Finish Reason: {finish_reason_name_str} ({finish_reason_value}). Error: {str(e_text)}"
+        elif actual_fr_max_tokens is not None and finish_reason_value == actual_fr_max_tokens:
+            return f"{ERROR_PREFIX}Response stopped due to maximum token limit. Finish Reason: {finish_reason_name_str} ({finish_reason_value}). Check 'max_output_tokens' in generation config and input/output length."
 
-    except AttributeError as e_attr: 
+        # If finish reason is STOP or any other reason that implies content should be present
+        if (actual_fr_stop is not None and finish_reason_value == actual_fr_stop) or \
+           (finish_reason_value not in [actual_fr_safety, actual_fr_max_tokens]): # Other reasons might still have content
+
+            if not candidate.content or not candidate.content.parts:
+                # This can happen even with STOP if the content is empty for some reason
+                return f"{ERROR_PREFIX}No valid content part in LLM response despite Finish Reason '{finish_reason_name_str}' ({finish_reason_value})."
+            
+            try:
+                return response.text # Successful case
+            except Exception as e_text:
+                return f"{ERROR_PREFIX}Failed to extract text from LLM response. Finish Reason: {finish_reason_name_str} ({finish_reason_value}). Error: {str(e_text)}"
+        
+        # Fallback for unhandled finish reasons if any (should be rare if above logic is complete)
+        return f"{ERROR_PREFIX}Unhandled LLM finish reason: {finish_reason_name_str} ({finish_reason_value})."
+
+    except AttributeError as e_attr:
+        # It's good to suggest checking the library version here.
         print(f"  LLM Response Processing AttributeError: {e_attr} (Hint: Check 'google-generativeai' library version or installation. Try: pip install --upgrade google-generativeai)")
         return f"{ERROR_PREFIX}Error processing LLM response attribute: {str(e_attr)}"
     except Exception as e_main:
         # print(f"  LLM API Call Exception: {e_main}")
         return f"{ERROR_PREFIX}Error during LLM API call: {str(e_main)}"
+
+def _format_prompt_feedback(prompt_feedback) -> str:
+    """Helper function to format prompt feedback details."""
+    if not prompt_feedback:
+        return "PromptFeedback not available"
+
+    details = []
+    if hasattr(prompt_feedback, 'block_reason') and prompt_feedback.block_reason:
+        # Ensure block_reason is converted to its name if it's an enum, or string directly
+        block_reason_val = prompt_feedback.block_reason
+        if hasattr(block_reason_val, 'name'): # It's an enum
+            details.append(f"Block Reason: {block_reason_val.name} ({block_reason_val.value})")
+        else: # It's likely already a string or simple type
+            details.append(f"Block Reason: {str(block_reason_val)}")
+    else:
+        details.append("Block Reason: N/A")
+
+    if hasattr(prompt_feedback, 'safety_ratings') and prompt_feedback.safety_ratings:
+        ratings_details = []
+        for rating in prompt_feedback.safety_ratings:
+            category_str = "UnknownCategory"
+            if hasattr(rating, 'category'):
+                if hasattr(rating.category, 'name'): # Enum
+                    category_str = f"{rating.category.name} ({rating.category.value})"
+                else: # String or other
+                    category_str = str(rating.category)
+            
+            probability_str = "UnknownProbability"
+            if hasattr(rating, 'probability'):
+                if hasattr(rating.probability, 'name'): # Enum
+                    probability_str = rating.probability.name
+                else: # String or other
+                    probability_str = str(rating.probability)
+
+            blocked_str = f", BlockedByThis: {rating.blocked}" if hasattr(rating, 'blocked') else "" # Some SDKs might have 'blocked'
+            
+            # Gemini specific: harm_severity and harm_probability_score might be present
+            severity_str = ""
+            if hasattr(rating, 'harm_severity') and rating.harm_severity:
+                 severity_str = f", Severity: {rating.harm_severity.name if hasattr(rating.harm_severity, 'name') else str(rating.harm_severity)}"
+            
+            score_str = ""
+            if hasattr(rating, 'harm_probability_score'): # This might be more specific for Gemini
+                score_str = f", ProbabilityScore: {rating.harm_probability_score:.2f}" if isinstance(rating.harm_probability_score, float) else f", ProbabilityScore: {rating.harm_probability_score}"
+
+
+            ratings_details.append(f"  - Category: {category_str}, Probability: {probability_str}{severity_str}{score_str}{blocked_str}")
+        
+        if ratings_details:
+            details.append("Safety Ratings:\n" + "\n".join(ratings_details))
+        else:
+            details.append("Safety Ratings: N/A or empty")
+    else:
+        details.append("Safety Ratings: N/A")
+    
+    return "; ".join(details)
 
 # LLM 결과 처리 및 통합 함수 (변경 없음)
 def process_llm_and_integrate(llm_output_string: str, original_ocr_results_for_block: list) -> tuple[list, list]:
