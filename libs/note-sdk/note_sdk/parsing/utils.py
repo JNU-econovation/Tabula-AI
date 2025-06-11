@@ -68,7 +68,7 @@ class SplitPDFFilesNode(BaseNode):
             # 파일이 실제로 생성되었는지 확인
             if os.path.exists(output_file):
                 ret.append(output_file)
-                logger.info(f"[SplitPDFFilesNode] Successfully created split PDF: {output_file}")
+                # logger.info(f"[SplitPDFFilesNode] Successfully created split PDF: {output_file}")
             else:
                 logger.error(f"[SplitPDFFilesNode] Failed to create split PDF: {output_file}")
 

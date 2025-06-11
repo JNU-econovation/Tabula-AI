@@ -1,10 +1,8 @@
 from bson import ObjectId
 from typing import Dict, Any
 from fastapi import APIRouter, UploadFile, Form, Depends, File
-import asyncio
 
 from note_service.service import NoteService
-from common_sdk.sse import get_progress_stream
 from common_sdk.auth import get_current_member
 from common_sdk.crud.s3 import S3Storage
 from common_sdk.crud.mongodb import MongoDB
@@ -13,7 +11,7 @@ from note_sdk.config import settings
 from common_sdk.swagger import note_service_response, note_service_space_response
 from common_sdk.exceptions import (
     UnsupportedNoteFileFormat, NoteFileSizeExceeded, SpaceIdNotFound, 
-    MissingSpaceId, MissingNoteFileData, MissingFieldData
+    MissingSpaceId, MissingNoteFileData, MissingFieldData, TokenExceeded
 )
 
 from common_sdk.get_logger import get_logger
@@ -60,7 +58,7 @@ async def upload_file(
         raise UnsupportedNoteFileFormat()
     
     # 파일 용량 검증
-    if file.size > 5 * 1024 * 1024:  # 5MB
+    if file.size > 10 * 1024 * 1024:  # 10MB
         logger.error(f"User: {userId} - File size exceeds limit: {file.size}")
         raise NoteFileSizeExceeded()
 
@@ -141,29 +139,24 @@ async def get_progress(
             logger.error(f"User: {user_id} - spaceId is missing")
             raise MissingSpaceId()
 
-        # 서비스 인스턴스가 준비될 때까지 최대 3초 대기(0.5초마다 1번씩 최대 6번 대기)
-        max_retries = 6  
-        retry_count = 0
-        
-        while retry_count < max_retries:
-            service = service_instances.get(spaceId)
-            if service:
-                # SSE 연결 시작
-                return get_progress_stream(spaceId, service)
+        # 서비스 인스턴스 조회
+        service = service_instances.get(spaceId)
+        if not service:
+            logger.error(f"User: {user_id} - Space not found: {spaceId}")
+            raise SpaceIdNotFound()
             
-            # 서비스 인스턴스가 아직 준비되지 않은 경우
-            logger.info(f"User: {user_id} - Waiting for service instance to be ready (attempt {retry_count + 1}/{max_retries})")
-            await asyncio.sleep(0.5)
-            retry_count += 1
+        # SSE 연결 시작
+        return get_progress_stream(spaceId, service)
         
-        # 최대 대기 시간을 초과한 경우
-        logger.error(f"User: {user_id} - Service instance not found after {max_retries} attempts: {spaceId}")
-        raise SpaceIdNotFound()
-        
+    except TokenExceeded as e:
+        logger.error(f"User: {user_id} - Token limit exceeded: {str(e)}")
+        update_progress(spaceId, -1, {
+            "status": "문서 크기가 너무 크기 때문에 더 작은 문서를 업로드해주세요."
+        })
+        raise
     except Exception as e:
         logger.error(f"User: {user_id} - Error in get_progress: {str(e)}")
         update_progress(spaceId, -1, {
-            "status": f"진행률 조회 실패: {str(e)}",
-            "result": {"spaceId": spaceId}
+            "status": "진행률 조회(SSE) 실패"
         })
         raise

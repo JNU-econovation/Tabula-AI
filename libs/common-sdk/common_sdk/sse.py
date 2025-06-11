@@ -67,12 +67,13 @@ async def progress_generator(space_id: str, service: Any = None):
                     }
                     break
                 elif progress == -1:
+                    error_message = status.get("status", StatusMessage.ERROR)
                     yield {
                         "event": "error",
                         "data": json.dumps({
                             "success": False,
                             "response": None,
-                            "error": status.get("status", StatusMessage.ERROR)
+                            "error": error_message
                         })
                     }
                     break
@@ -101,9 +102,20 @@ async def progress_generator(space_id: str, service: Any = None):
             })
         }
 
+# def get_progress_stream(space_id: str, service: Any = None):
+#     """진행률 스트림 반환"""
+#     return EventSourceResponse(progress_generator(space_id, service))
+
 def get_progress_stream(space_id: str, service: Any = None):
     """진행률 스트림 반환"""
-    return EventSourceResponse(progress_generator(space_id, service))
+    return EventSourceResponse(
+        progress_generator(space_id, service),
+        headers={
+            "X-Accel-Buffering": "no", 
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+            }
+        )
 
 # Result Service
 

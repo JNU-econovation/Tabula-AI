@@ -7,10 +7,9 @@ from langchain_openai import ChatOpenAI
 from langchain_core.messages import HumanMessage, SystemMessage 
 
 from common_sdk.config import settings as common_settings
-from note_sdk.config import settings
 from common_sdk.utils import num_tokens_from_string
 from common_sdk.prompt_loader import PromptLoader
-from common_sdk.exceptions import KeywordProcessingError, FileNotFoundError, TokenExceeded
+from common_sdk.exceptions import KeywordProcessingError, FileNotFoundError
 from common_sdk.get_logger import get_logger
 
 # 로거 설정
@@ -120,10 +119,6 @@ class KeywordGuide:
         try:
             with open(md_path, 'r', encoding='utf-8') as f:
                 content = f.read()
-            # 토큰 수 체크
-            token_count = num_tokens_from_string(content)
-            if token_count > settings.MAX_TOKEN:
-                raise TokenExceeded()
         except FileNotFoundError as e:
             logger.error(f"[generate_mindmap_from_markdown] Markdown file not found at {md_path}: {e}")
             raise FileNotFoundError(md_path)

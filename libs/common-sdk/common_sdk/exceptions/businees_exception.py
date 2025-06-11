@@ -105,7 +105,7 @@ class NoteFileSizeExceeded(HTTPException):
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={
                 "code": "FILE_413_1", 
-                "reason": "파일(PDF) 크기 허용 범위 초과입니다.(허용 범위: 5MB)",
+                "reason": "파일(PDF) 크기 허용 범위 초과입니다.(허용 범위: 10MB)",
                 "http_status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
             }
         )
@@ -117,7 +117,7 @@ class TokenExceeded(HTTPException):
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={
                 "code": "FILE_413_2", 
-                "reason": "파일(PDF)의 텍스트 토큰값 허용 범위 초과입니다.(허용 범위: 100,000 token)",
+                "reason": "파일(PDF)의 텍스트 토큰값 허용 범위 초과입니다.",
                 "http_status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
             }
         )
