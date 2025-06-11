@@ -67,12 +67,13 @@ async def progress_generator(space_id: str, service: Any = None):
                     }
                     break
                 elif progress == -1:
+                    error_message = status.get("status", StatusMessage.ERROR)
                     yield {
                         "event": "error",
                         "data": json.dumps({
                             "success": False,
                             "response": None,
-                            "error": status.get("status", StatusMessage.ERROR)
+                            "error": error_message
                         })
                     }
                     break

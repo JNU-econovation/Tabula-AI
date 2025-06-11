@@ -1,11 +1,16 @@
 from langchain_openai import ChatOpenAI
 from langchain_core.runnables import chain
+from openai import RateLimitError
 
 from note_sdk.llm import MultiModal
 from note_sdk.parsing.state import ParseState
 from note_sdk.parsing.base import BaseNode
 from note_sdk.parsing.preprocessing import IMAGE_TYPES
 from common_sdk.config import settings as common_settings
+from common_sdk.get_logger import get_logger
+from common_sdk.sse import update_progress
+
+logger = get_logger()
 
 # 이미지 엔티티 추출 클래스
 class PageElementsExtractorNode(BaseNode):
@@ -38,7 +43,6 @@ class PageElementsExtractorNode(BaseNode):
 
         # 실제 컨텐츠 채우기
         for page_num, elems in elements_by_page.items():
-            print(f"Page {page_num}:")
             for elem in elems:
                 if elem.category in IMAGE_TYPES:
                     images_by_page[page_num].append(elem)
@@ -127,11 +131,42 @@ AI algorithms, robotics, smart devices
     # 멀티모달 객체 생성
     multimodal_llm = MultiModal(llm)
 
-    # 이미지 파일로 부터 질의
-    answer = multimodal_llm.batch(
-        image_paths, system_prompts, user_prompts, display_image=False
-    )
-    return answer
+    try:
+        # 이미지 파일로 부터 질의
+        answer = multimodal_llm.batch(
+            image_paths, system_prompts, user_prompts, display_image=False
+        )
+        return answer
+    except RateLimitError as e:
+        logger.error(f"[ImageEntityExtractor] Rate limit exceeded: {str(e)}")
+        update_progress(
+            space_id=data_batches[0].get("space_id"),
+            progress=-1,
+            status={
+                "status": "error",
+                "error": {
+                    "code": "FILE_413_2",
+                    "reason": "파일(PDF)의 이미지 토큰값 허용 범위 초과입니다.",
+                    "http_status": 413
+                }
+            }
+        )
+        return []  # 빈 리스트 반환
+    except Exception as e:
+        logger.error(f"[ImageEntityExtractor] Image processing error: {str(e)}")
+        update_progress(
+            space_id=data_batches[0].get("space_id"),
+            progress=-1,
+            status={
+                "status": "error",
+                "error": {
+                    "code": "SSE_400_1",
+                    "reason": "진행률 조회(SSE) 에러 발생",
+                    "http_status": 400
+                }
+            }
+        )
+        return []  # 빈 리스트 반환
 
 
 class ImageEntityExtractorNode(BaseNode):
@@ -172,4 +207,3 @@ class ImageEntityExtractorNode(BaseNode):
                 element.entity = result
                 extracted_image_entities.append(element)
         return {"extracted_image_entities": extracted_image_entities}
-
