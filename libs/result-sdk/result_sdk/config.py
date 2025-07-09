@@ -49,8 +49,8 @@ class Settings:
         self.GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
         self.SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE_PATH")
         
-        # LLM 모델 이름을 config.py에서 직접 관리 (사용자 요청)
-        self.LLM_MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17" 
+        # LLM 모델 이름을 .env 파일에서 관리하도록 수정
+        self.LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-2.5-flash-lite-preview-06-17")
 
         # --- 경로 설정 ---
         # APP_ENV에 따라 다른 기본 경로 설정
