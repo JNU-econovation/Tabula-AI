@@ -1,6 +1,7 @@
 # 파일명: llm_interaction.py
 
 import re
+import json
 import google.generativeai as genai
 from PIL import Image
 from result_sdk.config import settings # 설정 가져오기
@@ -197,68 +198,56 @@ def _format_prompt_feedback(prompt_feedback) -> str:
     
     return "; ".join(details)
 
-# LLM 결과 처리 및 통합 함수 (변경 없음)
+# LLM 결과 처리 및 통합 함수 (최종 단순화)
 def process_llm_and_integrate(llm_output_string: str, original_ocr_results_for_block: list) -> tuple[list, list]:
-    llm_processed_info = {}
-    line_pattern = re.compile(r"ID\((\d+),(\d+),(\d+),(\d+)\):\s*(.*)")
-    merged_pattern = re.compile(r"__MERGED_TO_ID\((\d+),(\d+),(\d+),(\d+)\)__")
+    """
+    LLM의 JSON 응답을 파싱하여 RAG용 데이터와 시각화용 데이터를 생성합니다.
+    - 반환값 1: 시각화용 데이터 (LLM 출력 형식과 거의 동일)
+    - 반환값 2: RAG용 데이터
+    """
+    def _fallback_to_error_state(original_data):
+        # 에러 시, 원본 데이터를 RAG 데이터 형식으로 변환하여 최소한의 데이터라도 보존
+        rag_fallback = [
+            [[item['page_num'], item['block_id'], item['y_idx'], item['x_idx']], [item['text']]]
+            for item in original_data
+        ]
+        # 시각화용 데이터는 빈 리스트 반환
+        return [], rag_fallback
 
     if llm_output_string.startswith("LLM_RESPONSE_ERROR:"):
-        print(f"  LLM Error detected by custom prefix in process_llm_and_integrate: {llm_output_string}")
-        consolidated_data_block = []
-        for ocr_item in original_ocr_results_for_block:
-            item_copy = ocr_item.copy()
-            item_copy['llm_processed_text'] = ocr_item['text']
-            item_copy['llm_status'] = 'LLM_ERROR_FALLBACK'
-            consolidated_data_block.append(item_copy)
-        return consolidated_data_block, []
+        print(f"  LLM Error detected by custom prefix: {llm_output_string}")
+        return _fallback_to_error_state(original_ocr_results_for_block)
 
-    for line in llm_output_string.strip().split('\n'):
-        line_match = line_pattern.match(line)
-        if not line_match:
-            # print(f"  Warning: Could not parse LLM output line in process_llm_and_integrate: '{line}'")
-            continue
-        page_num, block_id_from_llm, y_idx, x_idx = map(int, line_match.group(1, 2, 3, 4)) # block_id는 LLM 응답에서 온 것
-        content = line_match.group(5).strip()
-        # current_id_tuple은 LLM 응답의 ID를 사용
-        current_id_tuple = (page_num, block_id_from_llm, y_idx, x_idx) 
-        
-        merged_match = merged_pattern.match(content)
-        if merged_match:
-            target_p, target_b, target_y, target_x = map(int, merged_match.group(1, 2, 3, 4))
-            llm_processed_info[current_id_tuple] = {
-                "status": "MERGED", "text": content,
-                "target_id": (target_p, target_b, target_y, target_x)
-            }
-        elif content == "__REMOVED__":
-            llm_processed_info[current_id_tuple] = {"status": "REMOVED", "text": ""}
-        else:
-            llm_processed_info[current_id_tuple] = {"status": "PROCESSED", "text": content}
+    try:
+        clean_json_string = llm_output_string.strip()
+        if clean_json_string.startswith('```json'):
+            clean_json_string = clean_json_string[7:]
+        if clean_json_string.endswith('```'):
+            clean_json_string = clean_json_string[:-3]
+        # LLM이 반환한 JSON 배열을 그대로 파싱
+        visualization_data = json.loads(clean_json_string.strip())
+        if not isinstance(visualization_data, list):
+             # 예상치 못한 형식일 경우 에러 처리
+            raise json.JSONDecodeError("LLM output is not a list", clean_json_string, 0)
+    except (json.JSONDecodeError, TypeError) as e:
+        print(f"  Error parsing LLM JSON response: {e}\n  Response was: '{llm_output_string[:200]}...'")
+        return _fallback_to_error_state(original_ocr_results_for_block)
 
-    consolidated_data_block = []
-    for ocr_item in original_ocr_results_for_block: # 이 ocr_item의 block_id는 현재 처리중인 블록의 ID
-        # LLM 응답에서 파싱된 ID와 비교해야 함.
-        # LLM은 프롬프트에 제공된 ID(page, block, y, x) 그대로 응답해야 함.
-        item_id_tuple = (ocr_item['page_num'], ocr_item['block_id'], ocr_item['y_idx'], ocr_item['x_idx'])
-        integrated_item = ocr_item.copy()
-        if item_id_tuple in llm_processed_info:
-            llm_info = llm_processed_info[item_id_tuple]
-            integrated_item['llm_processed_text'] = llm_info['text']
-            integrated_item['llm_status'] = llm_info['status']
-            if llm_info['status'] == 'MERGED':
-                integrated_item['llm_merged_target_id'] = llm_info['target_id']
-        else:
-            integrated_item['llm_processed_text'] = ocr_item['text']
-            integrated_item['llm_status'] = 'UNPROCESSED_BY_LLM'
-        consolidated_data_block.append(integrated_item)
-
+    id_pattern = re.compile(r"ID\((\d+),(\d+),(\d+),(\d+)\)")
     rag_ready_data_block = []
-    for item in consolidated_data_block:
-        if item.get('llm_status') == 'PROCESSED' and item.get('llm_processed_text','').strip():
-            id_list_for_rag = [item['page_num'], item['block_id'], item['y_idx'], item['x_idx']]
-            text_for_rag = item['llm_processed_text']
-            rag_ready_data_block.append([id_list_for_rag, [text_for_rag]])
-    return consolidated_data_block, rag_ready_data_block
+
+    for id_list, sentence in visualization_data:
+        if not id_list:
+            continue
+        
+        # 첫 번째 ID를 대표 ID로 사용하여 RAG 데이터 생성
+        match = id_pattern.match(id_list[0])
+        if match:
+            rag_id_tuple = tuple(map(int, match.groups()))
+            rag_ready_data_block.append([list(rag_id_tuple), [sentence]])
+
+    # 첫번째 반환값은 시각화용 데이터, 두번째는 RAG용 데이터
+    return visualization_data, rag_ready_data_block
 
 # LLM_interaction.py TestCode
 if __name__ == '__main__':
@@ -341,46 +330,42 @@ if __name__ == '__main__':
         print(f"경고: 테스트 이미지 경로 '{sample_image_path}'를 찾을 수 없어 get_llm_response 테스트를 건너<0xEB><0x9C><0x85>니다.")
 
 
-    # --- 4. process_llm_and_integrate 함수 테스트 ---
-    print("\n[4. process_llm_and_integrate 함수 테스트]")
-    mock_llm_output = """ID(1,0,1,1): 수정된 첫번째 텍스트
-ID(1,0,1,2): __MERGED_TO_ID(1,0,1,1)__
-ID(1,0,2,1): __REMOVED__
-ID(1,0,3,1): 이것은 처리됨"""
-
-    mock_original_for_integrate = [
-        {'page_num': 1, 'block_id': 0, 'y_idx': 1, 'x_idx': 1, 'text': '원본 첫번째', 'x1':10, 'y1':10, 'x2':20, 'y2':20, 'bounding_box':[]},
-        {'page_num': 1, 'block_id': 0, 'y_idx': 1, 'x_idx': 2, 'text': '원본 텍스트', 'x1':20, 'y1':10, 'x2':30, 'y2':20, 'bounding_box':[]},
-        {'page_num': 1, 'block_id': 0, 'y_idx': 2, 'x_idx': 1, 'text': '원본 다음줄', 'x1':10, 'y1':20, 'x2':20, 'y2':30, 'bounding_box':[]},
-        {'page_num': 1, 'block_id': 0, 'y_idx': 3, 'x_idx': 1, 'text': '이것은', 'x1':10, 'y1':30, 'x2':20, 'y2':40, 'bounding_box':[]},
-        {'page_num': 1, 'block_id': 0, 'y_idx': 3, 'x_idx': 2, 'text': '처리안됨', 'x1':20, 'y1':30, 'x2':30, 'y2':40, 'bounding_box':[]}, 
-    ]
-
-    consolidated_data, rag_data = process_llm_and_integrate(mock_llm_output, mock_original_for_integrate)
+    # --- 4. process_llm_and_integrate 함수 테스트 (최종 단순화) ---
+    print("\n[4. process_llm_and_integrate 함수 테스트 (최종 단순화)]")
     
-    print("통합된 데이터 (Consolidated Data):")
-    for item in consolidated_data:
-        print(f"  ID({item['page_num']},{item['block_id']},{item['y_idx']},{item['x_idx']}) "
-              f"Orig: '{item['text']}', LLM: '{item['llm_processed_text']}', Status: {item['llm_status']}"
-              + (f", MergedTo: {item['llm_merged_target_id']}" if 'llm_merged_target_id' in item else ""))
+    mock_llm_json_output = """
+    ```json
+    [
+      [["ID(1,0,1,1)"], "수정된 첫번째 텍스트"],
+      [["ID(1,0,1,2)", "ID(1,0,1,3)"], "두번째와 세번째는 병합됨"],
+      [["ID(1,0,2,1)"], "네번째 텍스트"]
+    ]
+    ```
+    """
+    # original_ocr_results_for_block는 이제 함수 내부에서 사용되지 않으므로 테스트에서 None으로 전달 가능
+    mock_original_for_integrate = [] 
+
+    visualization_data, rag_data = process_llm_and_integrate(mock_llm_json_output, mock_original_for_integrate)
+    
+    print("\n시각화용 데이터 (Visualization Data):")
+    print(json.dumps(visualization_data, indent=2, ensure_ascii=False))
 
     print("\nRAG 준비 데이터 (RAG Ready Data):")
     for item in rag_data:
         print(f"  {item}")
 
-    assert len(consolidated_data) == 5
-    assert consolidated_data[0]['llm_status'] == 'PROCESSED'
-    assert consolidated_data[0]['llm_processed_text'] == '수정된 첫번째 텍스트'
-    assert consolidated_data[1]['llm_status'] == 'MERGED'
-    assert consolidated_data[1]['llm_merged_target_id'] == (1,0,1,1)
-    assert consolidated_data[2]['llm_status'] == 'REMOVED'
-    assert consolidated_data[3]['llm_status'] == 'PROCESSED'
-    assert consolidated_data[4]['llm_status'] == 'UNPROCESSED_BY_LLM' 
-    
-    assert len(rag_data) == 2 
-    assert rag_data[0][0] == [1,0,1,1] 
-    assert rag_data[1][0] == [1,0,3,1] 
+    # 검증: RAG 데이터
+    assert len(rag_data) == 3
+    assert rag_data[0] == [[1, 0, 1, 1], ['수정된 첫번째 텍스트']]
+    assert rag_data[1] == [[1, 0, 1, 2], ['두번째와 세번째는 병합됨']]
+    assert rag_data[2] == [[1, 0, 2, 1], ['네번째 텍스트']]
 
-    print("process_llm_and_integrate 함수 테스트 통과!")
+    # 검증: 시각화용 데이터
+    assert len(visualization_data) == 3
+    assert visualization_data[0][0] == ["ID(1,0,1,1)"]
+    assert visualization_data[1][0] == ["ID(1,0,1,2)", "ID(1,0,1,3)"]
+    assert visualization_data[1][1] == "두번째와 세번째는 병합됨"
+
+    print("\nprocess_llm_and_integrate (최종 단순화) 함수 테스트 통과!")
 
     print("\n--- LLM_interaction.py 테스트 종료 ---")

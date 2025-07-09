@@ -6,11 +6,10 @@ import argparse
 import google.generativeai as genai
 
 # Adjust imports for the new structure
-from result_sdk.config import settings # result_sdk의 설정을 가져옴
+from result_sdk.config import settings
 from result_sdk.output_visualization import draw_underlines_for_incorrect_answers_enhanced
-from result_sdk.text_processing.core import process_document # 실제 문서 처리 함수
-# from common_sdk.prompt_loader import PromptLoader # common_sdk의 프롬프트 로더 대신 직접 임포트
-from result_sdk.result_processor.Prompt import gemini_prompt as PROMPT_TEMPLATE # Prompt.py에서 직접 가져옴
+from result_sdk.text_processing.core import process_document
+from common_sdk.prompt_loader import PromptLoader # 올바른 프롬프트 로더를 import
 
 def run_integration_visualization_test(input_file_path: str):
     """
@@ -19,6 +18,16 @@ def run_integration_visualization_test(input_file_path: str):
     print(f"Integrated Output Visualization Test Started for: '{input_file_path}'")
     print("=" * 70)
 
+    # YAML 파일에서 최신 프롬프트를 로드합니다.
+    prompt_loader = PromptLoader()
+    try:
+        ocr_prompt_data = prompt_loader.load_prompt('ocr-prompt')
+        PROMPT_TEMPLATE = ocr_prompt_data['template']
+        print("Successfully loaded prompt template from 'OCR-PROMPT.yaml'.")
+    except Exception as e:
+        print(f"Error loading prompt from YAML file: {e}")
+        raise
+
     if not settings.GOOGLE_API_KEY:
         raise ValueError("GOOGLE_API_KEY가 config.py 또는 환경 변수를 통해 설정되지 않았습니다.")
     try:
@@ -26,9 +35,6 @@ def run_integration_visualization_test(input_file_path: str):
         print("Google Generative AI SDK 설정 완료.")
     except Exception as e:
         print(f"오류: Google Generative AI SDK 설정 실패 - {e}")
-        # SDK 설정 실패 시, LLM을 사용하는 process_document가 실패할 수 있으므로 여기서 중단하는 것이 좋을 수 있음
-        # 또는 LLM 없이 OCR만 진행하도록 process_document를 수정하거나, 테스트를 제한적으로 실행할 수 있음
-        # 여기서는 일단 에러를 출력하고 계속 진행 (process_document 내부에서 LLM 호출 시 에러 처리될 것으로 기대)
 
     # Service account file path resolution
     service_file_from_settings = settings.SERVICE_ACCOUNT_FILE
@@ -65,19 +71,19 @@ def run_integration_visualization_test(input_file_path: str):
             )
     
     print(f"Using service account file: {actual_service_account_file}")
-    print(f"Using prompt template from result_sdk.result_processor.Prompt")
 
     print(f"\n[단계 1] '{input_file_path}' 문서 처리 중...")
     
-    all_consolidated_data, all_rag_ready_data, image_paths, created_temp_folder_path = process_document(
+    # process_document는 이제 5개의 값을 반환합니다.
+    all_visualization_data, all_rag_ready_data, all_original_ocr_data, image_paths, created_temp_folder_path = process_document(
         input_file_path=input_file_path,
-        service_account_file=actual_service_account_file, # Resolved absolute path
+        service_account_file=actual_service_account_file,
         temp_base_dir=settings.BASE_TEMP_DIR,
-        prompt_template=PROMPT_TEMPLATE, # Directly imported
+        prompt_template=PROMPT_TEMPLATE, # YAML에서 로드한 프롬프트 사용
         generation_config=settings.GENERATION_CONFIG,
         safety_settings=settings.SAFETY_SETTINGS
     )
-    print(f"문서 처리 완료. Consolidated: {len(all_consolidated_data)}, RAG_ready: {len(all_rag_ready_data)}, Images: {len(image_paths)}")
+    print(f"문서 처리 완료. Visualization: {len(all_visualization_data)}, RAG_ready: {len(all_rag_ready_data)}, Original_OCR: {len(all_original_ocr_data)}, Images: {len(image_paths)}")
 
     # 시각화 결과 저장 폴더 설정 (result_sdk의 settings.BASE_OUTPUT_DIR 사용)
     # output_base_dir은 result_sdk.settings.BASE_OUTPUT_DIR을 사용
@@ -86,10 +92,12 @@ def run_integration_visualization_test(input_file_path: str):
         shutil.rmtree(output_visualization_folder)
     os.makedirs(output_visualization_folder, exist_ok=True)
     
-    if image_paths and all_consolidated_data:
+    # 시각화는 visualization_data와 original_ocr_data를 사용합니다.
+    if image_paths and all_visualization_data and all_original_ocr_data:
         # 테스트용 오답 목데이터 (기존 테스트 스크립트에서 가져옴)
         mock_incorrect_rag_ids_to_test = [
             (1, 0, 3, 1), 
+            (1, 0, 5, 2),
             (1, 0, 7, 1),
             (1, 1, 3, 1),
             (1, 1, 4, 1),
@@ -111,18 +119,19 @@ def run_integration_visualization_test(input_file_path: str):
             print("\n[단계 2] 시각화할 유효한 오답 ID가 없습니다. 시각화 단계를 건너<0xEB><0x9C><0x85>니다.")
         else:
             print(f"\n[단계 2] 오답 시각화 진행 (유효 오답 ID: {valid_mock_ids})...")
+            # 수정한 visualizer 함수 시그니처에 맞게 인자 전달
             draw_underlines_for_incorrect_answers_enhanced(
                 incorrect_rag_ids=valid_mock_ids,
-                all_consolidated_data=all_consolidated_data, # 실제 처리된 데이터 사용
-                all_rag_ready_data=all_rag_ready_data,       # 실제 처리된 데이터 사용
-                page_image_paths=image_paths,                # 실제 처리된 이미지 경로 사용
+                all_visualization_data=all_visualization_data, # 시각화용 데이터 전달
+                all_original_ocr_data=all_original_ocr_data, # 원본 OCR 데이터 전달
+                page_image_paths=image_paths,
                 output_folder=output_visualization_folder,
-                underline_color=(0, 0, 255), # BGR: 빨간색으로 변경
+                underline_color=(0, 0, 255),
                 underline_thickness=2
             )
             print(f"시각화 결과는 '{output_visualization_folder}' 폴더를 확인하세요.")
     else:
-        print("\n문서 처리 결과(이미지 경로 또는 consolidated 데이터)가 없어 시각화를 진행할 수 없습니다.")
+        print("\n문서 처리 결과(이미지 경로, 시각화 데이터, 원본 OCR 데이터)가 없어 시각화를 진행할 수 없습니다.")
 
     if created_temp_folder_path and os.path.exists(created_temp_folder_path):
         try:

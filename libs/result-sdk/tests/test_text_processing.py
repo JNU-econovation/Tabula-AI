@@ -8,12 +8,23 @@ import google.generativeai as genai
 # Adjust imports for the new structure
 from result_sdk.config import settings
 from result_sdk.text_processing import process_document
-from result_sdk.result_processor.Prompt import gemini_prompt as PROMPT_TEMPLATE
+from common_sdk.prompt_loader import PromptLoader # 올바른 프롬프트 로더를 import
 
 def run_text_processing_test(input_file_path: str):
     """
     Runs the text processing part of the integration test.
     """
+    # YAML 파일에서 최신 프롬프트를 로드합니다.
+    prompt_loader = PromptLoader()
+    try:
+        # 'ocr-prompt.yaml' -> 'ocr-prompt' 키로 로드
+        ocr_prompt_data = prompt_loader.load_prompt('ocr-prompt')
+        PROMPT_TEMPLATE = ocr_prompt_data['template']
+        print("Successfully loaded prompt template from 'OCR-PROMPT.yaml'.")
+    except Exception as e:
+        print(f"Error loading prompt from YAML file: {e}")
+        # 실패 시 테스트를 중단하거나 기본 프롬프트를 사용할 수 있으나, 여기서는 중단
+        raise
     if not settings.GOOGLE_API_KEY:
         raise ValueError("GOOGLE_API_KEY is not set in result_sdk.config.settings")
     genai.configure(api_key=settings.GOOGLE_API_KEY)
@@ -104,6 +115,9 @@ def run_text_processing_test(input_file_path: str):
 
     print("=" * 70)
     print("Text Processing Test Finished.")
+
+    print("all_consolidated_data: \n", all_consolidated_data)
+    print("\n\nall_rag_ready_data: \n", all_rag_ready_data)
 
 if __name__ == '__main__':
     default_input_file = '/Users/ki/Desktop/Google Drive/Dev/Ecode/OCR_Test/예시_한국사.pdf'

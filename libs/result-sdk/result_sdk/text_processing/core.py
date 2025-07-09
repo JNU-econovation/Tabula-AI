@@ -37,7 +37,7 @@ def process_document(input_file_path: str,
                      generation_config: dict,
                      safety_settings: list,
                      pre_converted_image_paths: list = None
-                    ) -> tuple[list, list, list, str | None]:
+                    ) -> tuple[list, list, list, list, str | None]:
     print(f"문서 처리 시작: {input_file_path}")
     
     created_temp_folder_for_this_run = None
@@ -69,15 +69,14 @@ def process_document(input_file_path: str,
                 print(f"  (오류로 인한) 임시 폴더 '{created_temp_folder_for_this_run}' 삭제 중 오류: {e_del}")
         return [], [], [], None
 
-    all_consolidated_data_doc = []
+    all_visualization_data_doc = []
     all_rag_ready_data_doc = []
+    all_original_ocr_data_doc = []
 
     def task_process_block(block_id_for_task, ocr_chunks_this_block, current_page_num, current_image_file_path,
                            current_prompt_template, current_gen_config, current_safety_settings):
         if not ocr_chunks_this_block:
             return [], []
-        
-        print("\n\n *** OCR결과출력 *** \n",ocr_chunks_this_block)
 
         print(f"    [페이지 {current_page_num}, 블록 {block_id_for_task} - LLM 호출 준비] (청크 {len(ocr_chunks_this_block)}개)")
         ocr_chunk_list_str_block = format_ocr_results_for_prompt(ocr_chunks_this_block)
@@ -93,7 +92,7 @@ def process_document(input_file_path: str,
         )
         
         print(f"    [페이지 {current_page_num}, 블록 {block_id_for_task} - LLM 결과 처리 및 통합]...")
-        consolidated_data_b, rag_ready_data_b = process_llm_and_integrate(
+        visualization_data_b, rag_ready_data_b = process_llm_and_integrate(
             llm_response_text_block,
             ocr_chunks_this_block
         )
@@ -101,8 +100,8 @@ def process_document(input_file_path: str,
         if llm_response_text_block.startswith("LLM_RESPONSE_ERROR:"):
              print(f"    페이지 {current_page_num}, 블록 {block_id_for_task}: LLM 관련 오류로 RAG 데이터 생성 안됨.")
         
-        print(f"    페이지 {current_page_num}, 블록 {block_id_for_task} 처리 완료. Consolidated: {len(consolidated_data_b)}, RAG: {len(rag_ready_data_b)}")
-        return consolidated_data_b, rag_ready_data_b
+        print(f"    페이지 {current_page_num}, 블록 {block_id_for_task} 처리 완료. Visualization: {len(visualization_data_b)}, RAG: {len(rag_ready_data_b)}")
+        return visualization_data_b, rag_ready_data_b
 
     for page_idx, image_file_path in enumerate(image_files_to_process):
         page_num = page_idx + 1
@@ -123,6 +122,7 @@ def process_document(input_file_path: str,
             image_height, image_width, _ = image_for_size_check.shape
             split_x = find_vertical_split_point(raw_words, image_width)
             original_ocr_chunks_for_page = assign_ids_after_split(raw_words, split_x, page_num)
+            all_original_ocr_data_doc.extend(original_ocr_chunks_for_page) # 원본 OCR 데이터 수집
             if not original_ocr_chunks_for_page:
                 print(f"    페이지 {page_num}: ID가 할당된 OCR 결과가 없습니다. 다음 단계로 넘어갑니다.")
                 continue
@@ -131,7 +131,7 @@ def process_document(input_file_path: str,
             print(f"    페이지 {page_num} OCR 처리 중 예기치 않은 오류 발생하여 건너뜁니다: {e}")
             continue
             
-        page_consolidated_data_accumulator = []
+        page_visualization_data_accumulator = []
         page_rag_ready_data_accumulator = []
         ocr_blocks_for_page = {
             0: [item for item in original_ocr_chunks_for_page if item['block_id'] == 0],
@@ -153,24 +153,24 @@ def process_document(input_file_path: str,
             for future_completed in as_completed(future_to_block_map):
                 block_id_completed = future_to_block_map[future_completed]
                 try:
-                    consolidated_block_data, rag_block_data = future_completed.result()
-                    block_results_temp[block_id_completed] = (consolidated_block_data, rag_block_data)
+                    visualization_block_data, rag_block_data = future_completed.result()
+                    block_results_temp[block_id_completed] = (visualization_block_data, rag_block_data)
                 except Exception as exc:
                     print(f"    페이지 {page_num}, 블록 {block_id_completed} 병렬 처리 중 예외 발생: {exc}")
                     block_results_temp[block_id_completed] = ([], [])
             
             if 0 in block_results_temp:
-                page_consolidated_data_accumulator.extend(block_results_temp[0][0])
+                page_visualization_data_accumulator.extend(block_results_temp[0][0])
                 page_rag_ready_data_accumulator.extend(block_results_temp[0][1])
             if 1 in block_results_temp:
-                page_consolidated_data_accumulator.extend(block_results_temp[1][0])
+                page_visualization_data_accumulator.extend(block_results_temp[1][0])
                 page_rag_ready_data_accumulator.extend(block_results_temp[1][1])
 
-        all_consolidated_data_doc.extend(page_consolidated_data_accumulator)
+        all_visualization_data_doc.extend(page_visualization_data_accumulator)
         all_rag_ready_data_doc.extend(page_rag_ready_data_accumulator)
         print(f"\n  페이지 {page_num} 모든 블록 병렬 처리 완료.")
             
-    return all_consolidated_data_doc, all_rag_ready_data_doc, image_files_to_process, created_temp_folder_for_this_run
+    return all_visualization_data_doc, all_rag_ready_data_doc, all_original_ocr_data_doc, image_files_to_process, created_temp_folder_for_this_run
 
 
 if __name__ == '__main__':
@@ -201,7 +201,7 @@ if __name__ == '__main__':
         # 필요시 여기서 exit() 또는 기본값 설정
         exit()
 
-    final_consolidated_data, final_rag_data, processed_image_paths, temp_folder_used = process_document(
+    final_visualization_data, final_rag_data, final_original_ocr, processed_image_paths, temp_folder_used = process_document(
         input_file_path=args.input_file,
         service_account_file=config.settings.SERVICE_ACCOUNT_FILE, # config.settings로 접근
         temp_base_dir=config.settings.BASE_TEMP_DIR, # config.settings로 접근
@@ -211,8 +211,9 @@ if __name__ == '__main__':
     )
 
     print("\n\n\n--- 모든 페이지 처리 완료 (core.py 실행) ---")
-    print(f"총 통합된 데이터 항목 수: {len(final_consolidated_data)}")
+    print(f"총 시각화 데이터 항목 수: {len(final_visualization_data)}")
     print(f"총 RAG 준비 데이터 항목 수: {len(final_rag_data)}")
+    print(f"총 원본 OCR 데이터 항목 수: {len(final_original_ocr)}")
 
     if final_rag_data:
         print("\n--- 전체 RAG 준비 데이터 (일부 샘플) ---")

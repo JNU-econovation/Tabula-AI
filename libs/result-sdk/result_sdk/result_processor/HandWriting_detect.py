@@ -11,7 +11,9 @@ from google.oauth2 import service_account
 import google.auth.transport.requests
 from pdf2image import convert_from_path # PDF 처리를 위해 추가
 import shutil # 임시 폴더 삭제를 위해 추가 (선택 사항)
-from Prompt import gemini_prompt
+from .Prompt import gemini_prompt
+# LLM 상호작용 로직을 중앙화된 모듈에서 가져옵니다.
+from result_sdk.text_processing.LLM_interaction import get_llm_response, process_llm_and_integrate
 
 # .env파일 로드 (API관련 키 저장)
 load_dotenv()
@@ -187,88 +189,8 @@ def display_ocr_results(ocr_results_list):
     for item in ocr_results_list:
         print(f"ID({item['page_num']},{item['block_id']},{item['y_idx']},{item['x_idx']}): {item['text']}")
 
-# --- LLM 호출 함수 ---
-def get_llm_response(full_prompt: str, image_path: str,
-                     generation_config_dict: dict, safety_settings_list: list = None) -> str:
-    try: img = Image.open(image_path)
-    except FileNotFoundError: return "Error: Image file not found."
-    except Exception as e: return f"Error opening image: {e}"
-    model = genai.GenerativeModel('gemini-2.5-flash-lite-preview-06-17') #gemini-2.5-flash-preview-04-17을 사용하려고 했으나, 간헐적으로 오류가 발생하여 일단 1.5 flash사용.
-    contents = [full_prompt, img]
-    try:
-        response = model.generate_content(contents,
-            generation_config=genai.types.GenerationConfig(**generation_config_dict),
-            safety_settings=safety_settings_list)
-        if not response.candidates:
-            return f"Error: Request was blocked. Feedback: {response.prompt_feedback if response.prompt_feedback else 'Unknown'}"
-        return response.text
-    except Exception as e: return f"Error during LLM API call: {str(e)}"
-
-# --- LLM 결과 처리 함수  ---
-def process_llm_and_integrate(llm_output_string, original_ocr_results_for_page):
-    llm_processed_info = {}
-    # ID 파싱 정규식
-    line_pattern = re.compile(r"ID\((\d+),(\d+),(\d+),(\d+)\):\s*(.*)")
-    merged_pattern = re.compile(r"__MERGED_TO_ID\((\d+),(\d+),(\d+),(\d+)\)__")
-
-    if llm_output_string.startswith("Error:"):
-        print(f"LLM Error detected: {llm_output_string}")
-        consolidated_data = []
-        for ocr_item in original_ocr_results_for_page:
-            item_copy = ocr_item.copy()
-            item_copy['llm_processed_text'] = ocr_item['text']
-            item_copy['llm_status'] = 'LLM_ERROR_FALLBACK'
-            consolidated_data.append(item_copy)
-        return consolidated_data, []
-
-    for line in llm_output_string.strip().split('\n'):
-        line_match = line_pattern.match(line)
-        if not line_match:
-            print(f"Warning: Could not parse LLM output line: {line}")
-            continue
-        # ID 파싱
-        page_num, block_id, y_idx, x_idx = map(int, line_match.group(1, 2, 3, 4))
-        content = line_match.group(5).strip()
-        current_id_tuple = (page_num, block_id, y_idx, x_idx) # 4-element tuple
-        merged_match = merged_pattern.match(content)
-        if merged_match:
-            # target ID 파싱
-            target_p, target_b, target_y, target_x = map(int, merged_match.group(1, 2, 3, 4))
-            llm_processed_info[current_id_tuple] = {
-                "status": "MERGED", "text": content,
-                "target_id": (target_p, target_b, target_y, target_x) # 4-element tuple
-            }
-        elif content == "__REMOVED__":
-            llm_processed_info[current_id_tuple] = {"status": "REMOVED", "text": ""}
-        else:
-            llm_processed_info[current_id_tuple] = {"status": "PROCESSED", "text": content}
-
-    consolidated_data = []
-    for ocr_item in original_ocr_results_for_page:
-        # item_id_tuple 생성 시 page_num 포함
-        item_id_tuple = (ocr_item['page_num'], ocr_item['block_id'], ocr_item['y_idx'], ocr_item['x_idx'])
-        integrated_item = ocr_item.copy()
-        if item_id_tuple in llm_processed_info:
-            llm_info = llm_processed_info[item_id_tuple]
-            integrated_item['llm_processed_text'] = llm_info['text']
-            integrated_item['llm_status'] = llm_info['status']
-            if llm_info['status'] == 'MERGED':
-                integrated_item['llm_merged_target_id'] = llm_info['target_id']
-        else:
-            integrated_item['llm_processed_text'] = ocr_item['text']
-            integrated_item['llm_status'] = 'UNPROCESSED_BY_LLM'
-        consolidated_data.append(integrated_item)
-
-    rag_ready_data = []
-    for item in consolidated_data:
-        if item.get('llm_status') == 'PROCESSED' and item.get('llm_processed_text','').strip():
-            # RAG 데이터 형식 변경: [[id_list], [text_string_in_list]]
-            id_list_for_rag = [item['page_num'], item['block_id'], item['y_idx'], item['x_idx']]
-            text_for_rag = item['llm_processed_text']
-            rag_ready_data.append([id_list_for_rag, [text_for_rag]]) # 텍스트를 리스트로 감쌈
-            # RAG에 바운딩 박스 정보도 필요하다면 아래와 같이 추가 가능
-            # rag_ready_data.append([id_list_for_rag, [text_for_rag], item['bounding_box']])
-    return consolidated_data, rag_ready_data
+# --- LLM 호출 및 결과 처리 함수는 LLM_interaction 모듈에서 import하여 사용 ---
+# (이 파일 내의 중복 정의된 함수들은 삭제)
 
 #ID형식 지정
 def format_ocr_results_for_prompt(ocr_page_results):
