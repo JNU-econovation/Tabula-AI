@@ -77,6 +77,8 @@ def process_document(input_file_path: str,
         if not ocr_chunks_this_block:
             return [], []
         
+        print("\n\n *** OCR결과출력 *** \n",ocr_chunks_this_block)
+
         print(f"    [페이지 {current_page_num}, 블록 {block_id_for_task} - LLM 호출 준비] (청크 {len(ocr_chunks_this_block)}개)")
         ocr_chunk_list_str_block = format_ocr_results_for_prompt(ocr_chunks_this_block)
         full_prompt_for_llm_block = build_full_prompt(ocr_chunk_list_str_block, current_prompt_template)

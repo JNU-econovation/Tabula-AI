@@ -72,7 +72,7 @@ class Settings:
         self.GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
         self.SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE_PATH")
         # LLM 모델 이름을 config.py에서 직접 관리 (사용자 요청)
-        self.LLM_MODEL_NAME = "gemini-2.5-flash-preview-05-20" 
+        self.LLM_MODEL_NAME = "gemini-2.5-flash-lite-preview-06-17" 
 
         # Path configurations based on APP_ENV
         # Using RESULT_SDK_ROOT as the base for development paths.

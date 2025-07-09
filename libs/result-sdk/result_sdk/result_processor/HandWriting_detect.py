@@ -193,7 +193,7 @@ def get_llm_response(full_prompt: str, image_path: str,
     try: img = Image.open(image_path)
     except FileNotFoundError: return "Error: Image file not found."
     except Exception as e: return f"Error opening image: {e}"
-    model = genai.GenerativeModel('gemini-1.5-flash-latest') #gemini-2.5-flash-preview-04-17을 사용하려고 했으나, 간헐적으로 오류가 발생하여 일단 1.5 flash사용.
+    model = genai.GenerativeModel('gemini-2.5-flash-lite-preview-06-17') #gemini-2.5-flash-preview-04-17을 사용하려고 했으나, 간헐적으로 오류가 발생하여 일단 1.5 flash사용.
     contents = [full_prompt, img]
     try:
         response = model.generate_content(contents,
