@@ -1,5 +1,6 @@
 import json
 import asyncio
+import time
 
 from typing import Dict, Any
 from sse_starlette.sse import EventSourceResponse
@@ -31,6 +32,8 @@ def update_progress(space_id: str, progress: int, status: Dict[str, Any] = None)
 
 async def progress_generator(space_id: str, service: Any = None):
     try:
+        logger.info(f"[progress_generator] Starting SSE connection for space_id: {space_id}")
+        
         # 1. 초기 상태 확인
         if space_id not in progress_store:
             update_progress(space_id, 0, {
@@ -44,51 +47,76 @@ async def progress_generator(space_id: str, service: Any = None):
             asyncio.create_task(service.process_document())
         
         # 3. SSE 연결 시작
+        last_progress = -1
+        last_ping_time = time.time()
+        logger.info(f"[progress_generator] Initial last_ping_time: {last_ping_time}")
+        
         while True:
+            current_time = time.time()
+            time_since_last_ping = current_time - last_ping_time
+            
+            # ping 전송 조건을 먼저 체크
+            if time_since_last_ping >= 10:
+                logger.info(f"[progress_generator] Time since last ping: {time_since_last_ping:.2f}s")
+                last_ping_time = current_time
+                logger.info(f"[progress_generator] Updated last_ping_time: {last_ping_time}")
+                yield {
+                    "event": "ping",
+                    "data": json.dumps({"ping": "keep-alive"})
+                }
+                continue
+            
+            # progress_store 체크
             if space_id in progress_store:
                 data = progress_store[space_id]
                 progress = data["progress"]
                 status = data.get("status", {})
                 result = data.get("result", {})
                 
-                # 4. 진행 상태에 따른 이벤트 전송
-                if progress == 100:
-                    yield {
-                        "event": "complete",
-                        "data": json.dumps({
-                            "success": True,
-                            "response": {
-                                "progress": 100,
-                                "spaceId": result.get("spaceId"),
-                                "spaceName": result.get("spaceName")
-                            },
-                            "error": None
-                        })
-                    }
-                    break
-                elif progress == -1:
-                    error_message = status.get("status", StatusMessage.ERROR)
-                    yield {
-                        "event": "error",
-                        "data": json.dumps({
-                            "success": False,
-                            "response": None,
-                            "error": error_message
-                        })
-                    }
-                    break
-                else:
-                    # 진행 중인 경우
-                    yield {
-                        "event": "progress",
-                        "data": json.dumps({
-                            "success": True,
-                            "response": {
-                                "progress": progress
-                            },
-                            "error": None
-                        })
-                    }
+                if progress != last_progress:
+                    last_progress = progress
+                    logger.info(f"[progress_generator] Progress updated for space_id: {space_id}, progress: {progress}")
+                    
+                    if progress == 100:
+                        # 완료 처리
+                        yield {
+                            "event": "complete",
+                            "data": json.dumps({
+                                "success": True,
+                                "response": {
+                                    "progress": 100,
+                                    "spaceId": result.get("spaceId"),
+                                    "spaceName": result.get("spaceName")
+                                },
+                                "error": None
+                            })
+                        }
+                        break
+                    elif progress == -1:
+                        # 에러 처리
+                        error_message = status.get("status", StatusMessage.ERROR)
+                        yield {
+                            "event": "error",
+                            "data": json.dumps({
+                                "success": False,
+                                "response": None,
+                                "error": error_message
+                            })
+                        }
+                        break
+                    else:
+                        # 진행 중
+                        yield {
+                            "event": "progress",
+                            "data": json.dumps({
+                                "success": True,
+                                "response": {
+                                    "progress": progress
+                                },
+                                "error": None
+                            })
+                        }
+            
             await asyncio.sleep(0.1)
             
     except Exception as e:
