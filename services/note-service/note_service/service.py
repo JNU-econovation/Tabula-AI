@@ -70,16 +70,14 @@ class NoteService:
     async def update_progress(self, stage: str, status: str, result: Dict = None):
         if stage in self.progress_stages:
             progress = self.progress_stages[stage]
-            # 진행률이 증가하는 경우에만 업데이트
             if progress > self.current_progress:  
                 self.current_progress = progress
                 update_progress(self.space_id, self.current_progress, {
                     "status": status,
                     "result": result or {"spaceId": self.space_id}
                 })
-                # 진행률 표시를 위한 딜레이
-                await asyncio.sleep(0.5)
-                
+                # 딜레이 줄이기
+                await asyncio.sleep(0.1)  # 0.5초에서 0.1초로 줄임
 
     async def process_document(self) -> Dict[str, Any]:
         try:

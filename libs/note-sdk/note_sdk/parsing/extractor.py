@@ -138,20 +138,9 @@ AI algorithms, robotics, smart devices
         )
         return answer
     except RateLimitError as e:
-        logger.error(f"[ImageEntityExtractor] Rate limit exceeded: {str(e)}")
-        update_progress(
-            space_id=data_batches[0].get("space_id"),
-            progress=-1,
-            status={
-                "status": "error",
-                "error": {
-                    "code": "FILE_413_2",
-                    "reason": "파일(PDF)의 이미지 토큰값 허용 범위 초과입니다.",
-                    "http_status": 413
-                }
-            }
-        )
-        return []  # 빈 리스트 반환
+        # Rate limit 에러는 로그만 남기고 계속 진행
+        logger.warning(f"[ImageEntityExtractor] Rate limit exceeded: {str(e)}")
+        return []  # 빈 리스트 반환하고 계속 진행
     except Exception as e:
         logger.error(f"[ImageEntityExtractor] Image processing error: {str(e)}")
         update_progress(
