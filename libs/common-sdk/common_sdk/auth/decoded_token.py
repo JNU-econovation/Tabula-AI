@@ -44,5 +44,10 @@ def get_current_member(token: str = Depends(get_token_from_header)):
         return user_id
 
     except ExpiredSignatureError:
-        logger.error(f"[get_current_member] Token expired for user_id: {decoded_payload.get('sub', 'unknown')}")
+        # 토큰이 만료된 경우 decoded_payload에 접근할 수 없으므로 안전하게 처리
+        logger.error("[get_current_member] Token expired")
         raise ExpiredJWT()
+    except Exception as e:
+        # 기타 JWT 관련 예외 처리
+        logger.error(f"[get_current_member] JWT decode error: {str(e)}")
+        raise InvalidJWT()

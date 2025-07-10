@@ -110,18 +110,17 @@ class NoteFileSizeExceeded(HTTPException):
             }
         )
 
-# 파일 내 존재하는 토큰 초과
-class TokenExceeded(HTTPException):
+# PDF 페이지 수 초과
+class NoteFilePageExceeded(HTTPException):
     def __init__(self):
         super().__init__(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail={
                 "code": "FILE_413_2", 
-                "reason": "파일(PDF)의 텍스트 토큰값 허용 범위 초과입니다.",
+                "reason": "PDF 페이지 수가 허용 범위를 초과했습니다.",
                 "http_status": status.HTTP_413_REQUEST_ENTITY_TOO_LARGE
             }
         )
-
 
 # 학습 결과물 파일 데이터(PDF / Image) 누락
 class MissingResultFileData(HTTPException):
