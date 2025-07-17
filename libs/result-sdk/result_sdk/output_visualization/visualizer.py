@@ -77,12 +77,19 @@ def draw_underlines_for_incorrect_answers_enhanced(
                         chunks_for_this_sentence.append(ocr_data_lookup[id_tuple])
             
             if chunks_for_this_sentence:
-                min_x1 = min(c['x1'] for c in chunks_for_this_sentence)
-                max_x2 = max(c['x2'] for c in chunks_for_this_sentence)
-                # 밑줄 y 위치는 문장을 구성하는 모든 청크의 가장 아래 y2 기준
-                underline_y = max(c['y2'] for c in chunks_for_this_sentence) + underline_offset
+                # 여러 줄에 걸친 문장을 처리하기 위해 y_idx를 기준으로 청크를 그룹화
+                chunks_by_line = defaultdict(list)
+                for chunk in chunks_for_this_sentence:
+                    chunks_by_line[chunk['y_idx']].append(chunk)
                 
-                lines_to_draw_on_page[page_num_of_sentence].append((min_x1, underline_y, max_x2, underline_y))
+                # 각 줄별로 밑줄을 계산하고 추가
+                for _, line_chunks in chunks_by_line.items():
+                    if not line_chunks:
+                        continue
+                    min_x1 = min(c['x1'] for c in line_chunks)
+                    max_x2 = max(c['x2'] for c in line_chunks)
+                    underline_y = max(c['y2'] for c in line_chunks) + underline_offset
+                    lines_to_draw_on_page[page_num_of_sentence].append((min_x1, underline_y, max_x2, underline_y))
 
     if not lines_to_draw_on_page:
         print("  No lines found to underline.")

@@ -47,10 +47,24 @@ class Settings:
         # --- API 키 및 외부 서비스 설정 ---
         self.PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
         self.GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-        self.SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE_PATH")
+        
+        # 서비스 계정 파일 경로를 절대 경로로 변환
+        service_account_path = os.getenv("SERVICE_ACCOUNT_FILE_PATH")
+        if service_account_path and not os.path.isabs(service_account_path):
+            # 프로젝트 루트는 이 파일 위치(libs/result-sdk/result_sdk)에서 3단계 위
+            project_root = Path(__file__).parent.parent.parent.parent.resolve()
+            self.SERVICE_ACCOUNT_FILE = str(project_root / service_account_path)
+        else:
+            self.SERVICE_ACCOUNT_FILE = service_account_path
         
         # LLM 모델 이름을 .env 파일에서 관리하도록 수정
         self.LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-2.5-flash-lite-preview-06-17")
+
+        # --- Pinecone 인덱스 이름 설정 ---
+        self.INDEX_NAME_KOR_DEN_CONTENTS = os.getenv("INDEX_NAME_KOR_DEN_CONTENTS")
+        self.INDEX_NAME_KOR_SPA_CONTENTS = os.getenv("INDEX_NAME_KOR_SPA_CONTENTS")
+        self.INDEX_NAME_ENG_DEN_CONTENTS = os.getenv("INDEX_NAME_ENG_DEN_CONTENTS")
+        self.INDEX_NAME_ENG_SPA_CONTENTS = os.getenv("INDEX_NAME_ENG_SPA_CONTENTS")
 
         # --- 경로 설정 ---
         # APP_ENV에 따라 다른 기본 경로 설정
