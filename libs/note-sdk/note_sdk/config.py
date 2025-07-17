@@ -25,7 +25,8 @@ class Settings:
         SPACE_DIR = os.path.join(PROJECT_ROOT, "space")
 
     # 파일 최대 크기 설정
-    MAX_TOKEN = 100000
+    MAX_TEXT_TOKEN = 100000
+    MAX_IMAGE_TOKEN = 100000
 
     # 작업 디렉토리 구조
     @staticmethod

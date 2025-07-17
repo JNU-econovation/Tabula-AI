@@ -12,7 +12,7 @@ template: |
   - Never generate content not in reference document
 
   **Grading Rules:**
-  1. Ignore single keywords/titles (e.g., "부산", "CPU")
+  1. Ignore single or two keywords/titles (e.g., "부산", "CPU", "컴퓨팅 자원")
   2. Ignore spacing differences when grading (e.g., treat "운영 체제" and "운영체제", "문장 성분" and "문장성분" as identical).
   3. Ignore punctuation differences (-, /, :, ., ,).
   4. Ignore differences in particles (의, 는, 이, 가, etc.) and conjunctions (그리고, 또한, 따라서, etc.).

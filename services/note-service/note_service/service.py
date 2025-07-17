@@ -10,8 +10,9 @@ from note_sdk.image_processor import ImageSummary
 from note_sdk.vector_store import VectorLoader
 from common_sdk.sse import update_progress
 from common_sdk.crud.mongodb import MongoDB
+from common_sdk.utils import num_tokens_from_string
 from note_sdk.config import settings
-from common_sdk.exceptions import FileNotFoundError
+from common_sdk.exceptions import FileNotFoundError, TokenExceeded
 from common_sdk.get_logger import get_logger
 from common_sdk.constants import ProgressPhase, StatusMessage
 
@@ -69,16 +70,14 @@ class NoteService:
     async def update_progress(self, stage: str, status: str, result: Dict = None):
         if stage in self.progress_stages:
             progress = self.progress_stages[stage]
-            # 진행률이 증가하는 경우에만 업데이트
             if progress > self.current_progress:  
                 self.current_progress = progress
                 update_progress(self.space_id, self.current_progress, {
                     "status": status,
                     "result": result or {"spaceId": self.space_id}
                 })
-                # 진행률 표시를 위한 딜레이
-                await asyncio.sleep(0.5)
-                
+                # 딜레이 줄이기
+                await asyncio.sleep(0.1)  # 0.5초에서 0.1초로 줄임
 
     async def process_document(self) -> Dict[str, Any]:
         try:
@@ -192,6 +191,12 @@ class NoteService:
         
         with open(md_path, 'r', encoding='utf-8') as f:
             content = f.read()
+            
+        # 토큰 수 체크
+        token_count = num_tokens_from_string(content)
+        if token_count > settings.MAX_TEXT_TOKEN:
+            logger.error(f"[NoteService] User: {self.user_id} - Text token exceeded: {token_count} > {settings.MAX_TEXT_TOKEN}")
+            raise TokenExceeded()
         
         success = await self.vector_loader.process_markdown(content, self.document_id)
         return success
@@ -199,6 +204,16 @@ class NoteService:
     # 키워드 생성 로직
     async def generate_keywords(self):
         md_path = self.md_dir / f"{self.document_id}.md"
+        
+        with open(md_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        # 토큰 수 체크
+        token_count = num_tokens_from_string(content)
+        if token_count > settings.MAX_TEXT_TOKEN:
+            logger.error(f"[NoteService] User: {self.user_id} - Token count exceeded: {token_count} > {settings.MAX_TEXT_TOKEN}")
+            raise TokenExceeded()
+            
         keyword_result = self.keyword_guide.generate_mindmap_from_markdown(str(md_path))
         
         if keyword_result:
