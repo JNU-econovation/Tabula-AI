@@ -1,117 +1,92 @@
-# libs/result-sdk/tests/test_text_processing.py
+"""
+텍스트 처리 통합 테스트 스크립트
+실제 문서를 입력받아 전체 텍스트 처리 파이프라인을 실행하고 결과를 출력
+"""
 
 import os
 import shutil
 import argparse
 import google.generativeai as genai
 
-# Adjust imports for the new structure
 from result_sdk.config import settings
 from result_sdk.text_processing import process_document
-from result_sdk.result_processor.Prompt import gemini_prompt as PROMPT_TEMPLATE
+from common_sdk.prompt_loader import PromptLoader
 
 def run_text_processing_test(input_file_path: str):
     """
-    Runs the text processing part of the integration test.
+    텍스트 처리 파이프라인에 대한 통합 테스트 실행
     """
+    print(f"Text Processing Test Started: Processing '{input_file_path}'")
+    print("=" * 70)
+
+    # --- 설정 및 초기화 ---
+    prompt_loader = PromptLoader()
+    try:
+        ocr_prompt_data = prompt_loader.load_prompt('ocr-prompt')
+        PROMPT_TEMPLATE = ocr_prompt_data['template']
+        print("Successfully loaded prompt template from 'OCR-PROMPT.yaml'.")
+    except Exception as e:
+        print(f"Error loading prompt from YAML file: {e}")
+        raise
+
     if not settings.GOOGLE_API_KEY:
         raise ValueError("GOOGLE_API_KEY is not set in result_sdk.config.settings")
     genai.configure(api_key=settings.GOOGLE_API_KEY)
 
-    # Determine the absolute path for the service account file
-    service_file_from_settings = settings.SERVICE_ACCOUNT_FILE
-    if not service_file_from_settings:
-        raise ValueError("SERVICE_ACCOUNT_FILE_PATH is not set in the environment/config.")
+    if not settings.SERVICE_ACCOUNT_FILE or not os.path.exists(settings.SERVICE_ACCOUNT_FILE):
+        raise ValueError(f"Service account file not found: {settings.SERVICE_ACCOUNT_FILE}")
+    print(f"Using service account file: {settings.SERVICE_ACCOUNT_FILE}")
 
-    if os.path.isabs(service_file_from_settings):
-        actual_service_account_file = service_file_from_settings
-    else:
-        # Assuming service_file_from_settings is relative to the project root.
-        # Project root is three levels up from this test file's directory (libs/result-sdk/tests/).
-        project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-        actual_service_account_file = os.path.join(project_root, service_file_from_settings)
-
-    if not os.path.exists(actual_service_account_file):
-        raise ValueError(
-            f"Resolved SERVICE_ACCOUNT_FILE ('{actual_service_account_file}') does not exist. "
-            f"Original path from settings: '{service_file_from_settings}'"
-        )
-    
-    print(f"Using service account file: {actual_service_account_file}")
-    print(f"Text Processing Test Started: Processing '{input_file_path}'")
-    print("=" * 70)
-
-    os.makedirs(settings.BASE_TEMP_DIR, exist_ok=True)
-    os.makedirs(settings.BASE_OUTPUT_DIR, exist_ok=True) # Ensure output dir also exists
-
-    # The process_document function from kiwi.core.py returned:
-    # all_consolidated_data, all_rag_ready_data, image_paths_for_all_pages, final_temp_pdf_image_folder
-    # Assuming the refactored text_processing.core.process_document returns the same.
-    results = process_document(
+    # --- 문서 처리 실행 ---
+    # process_document는 시각화 데이터, RAG 데이터, 원본 OCR 데이터, 이미지 경로, 임시 폴더 경로를 반환
+    vis_data, rag_data, ocr_data, img_paths, temp_folder = process_document(
         input_file_path=input_file_path,
-        service_account_file=actual_service_account_file,
+        service_account_file=settings.SERVICE_ACCOUNT_FILE,
         temp_base_dir=settings.BASE_TEMP_DIR,
         prompt_template=PROMPT_TEMPLATE,
         generation_config=settings.GENERATION_CONFIG,
         safety_settings=settings.SAFETY_SETTINGS
-        # llm_model_name is part of settings, process_document should use it if needed
     )
 
-    if not isinstance(results, tuple) or len(results) < 3:
-        print(f"Error: process_document returned unexpected data type or too few values: {type(results)}")
-        return
-
-    all_consolidated_data, all_rag_ready_data, image_paths = results[:3]
-    created_temp_folder_path = results[3] if len(results) == 4 else None
-
-    print(f"Document processing complete.")
+    # --- 결과 요약 출력 ---
+    print("\n--- Document Processing Complete ---")
+    print(f"  - Visualization data items: {len(vis_data)}")
+    print(f"  - RAG ready data items: {len(rag_data)}")
+    print(f"  - Original OCR data items: {len(ocr_data)}")
+    print(f"  - Processed image pages: {len(img_paths)}")
     print("-" * 30)
-    print("OCR and LLM Processed Data (Consolidated):")
-    if all_consolidated_data:
-        for i, item in enumerate(all_consolidated_data[:3]): # Print first 3 items as a sample
-            print(f"  Item {i+1}: {item}")
-        if len(all_consolidated_data) > 3:
-            print(f"  ... and {len(all_consolidated_data) - 3} more items.")
+
+    # --- 샘플 데이터 출력 ---
+    print("\n[Visualization Data Sample (Top 3)]")
+    if vis_data:
+        for i, item in enumerate(vis_data[:3]):
+            print(f"  {i+1}: {str(item)[:100]}...")
     else:
-        print("  No consolidated data produced.")
-    print("-" * 30)
+        print("  No data produced.")
 
-    print("RAG Ready Data:")
-    if all_rag_ready_data:
-        for i, item in enumerate(all_rag_ready_data[:3]): # Print first 3 items as a sample
-            print(f"  Item {i+1}: {item}")
-        if len(all_rag_ready_data) > 3:
-            print(f"  ... and {len(all_rag_ready_data) - 3} more items.")
+    print("\n[RAG Ready Data Sample (Top 3)]")
+    if rag_data:
+        for i, item in enumerate(rag_data[:3]):
+            print(f"  {i+1}: {str(item)[:100]}...")
     else:
-        print("  No RAG ready data produced.")
-    print("-" * 30)
+        print("  No data produced.")
 
-    print(f"  Consolidated data items: {len(all_consolidated_data)}")
-    print(f"  RAG ready data items: {len(all_rag_ready_data)}")
-    print(f"  Image paths generated: {len(image_paths)}")
-    if created_temp_folder_path:
-        print(f"  Temp folder used/returned: {created_temp_folder_path}")
-
-
-    if created_temp_folder_path and os.path.exists(created_temp_folder_path):
+    # --- 정리 ---
+    if temp_folder and os.path.exists(temp_folder):
         try:
-            shutil.rmtree(created_temp_folder_path)
-            print(f"\nCleaned up temporary folder: '{created_temp_folder_path}'")
+            shutil.rmtree(temp_folder)
+            print(f"\nCleaned up temporary folder: '{temp_folder}'")
         except Exception as e:
-            print(f"\nError cleaning up temporary folder '{created_temp_folder_path}': {e}")
-    else:
-        print(f"\nNote: 'created_temp_folder_path' ('{created_temp_folder_path}') not returned, does not exist, or is None. Specific temp folder cleanup might be skipped.")
+            print(f"\nError cleaning up temporary folder '{temp_folder}': {e}")
 
     print("=" * 70)
     print("Text Processing Test Finished.")
 
 if __name__ == '__main__':
-    default_input_file = '/Users/ki/Desktop/Google Drive/Dev/Ecode/OCR_Test/예시_한국사.pdf'
-    
     parser = argparse.ArgumentParser(description="Text Processing Test Script for result-sdk")
     parser.add_argument(
         "--input_file",
-        default=os.getenv("TEST_INPUT_FILE", default_input_file),
+        default=os.getenv("TEST_INPUT_FILE", '/Users/ki/Desktop/Google Drive/Dev/Ecode/OCR_Test/예시_한국사.pdf'),
         help="Path to the PDF or image file to process for testing."
     )
     args = parser.parse_args()
