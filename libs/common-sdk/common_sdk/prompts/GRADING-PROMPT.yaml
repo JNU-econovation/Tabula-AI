@@ -11,15 +11,30 @@ template: |
   - Output JSON only, no extra text
   - Never generate content not in reference document
 
-  **Grading Rules:**
-  1. Ignore single or two keywords/titles (e.g., "부산", "CPU", "컴퓨팅 자원")
-  2. Ignore spacing differences when grading (e.g., treat "운영 체제" and "운영체제", "문장 성분" and "문장성분" as identical).
-  3. Ignore punctuation differences (-, /, :, ., ,).
-  4. Ignore differences in particles (의, 는, 이, 가, etc.) and conjunctions (그리고, 또한, 따라서, etc.).
-  5. Focus on content errors (dates, people, events, places, concepts, formulas, principles, etc.).
-  6. Prioritize semantic over exact string matching.
-  7. Ignore case differences in English words (e.g., treat "CPU" and "cpu", "HTTP" and "http" as identical).
-  8. Ignore writing style differences if content is same.
+  **Grading Rules (Apply LENIENT standards):**
+  1. **IGNORE completely:** Single or two keywords/titles (e.g., "부산", "CPU", "컴퓨팅 자원")
+  2. **IGNORE completely:** Spacing differences (e.g., "운영 체제" = "운영체제", "문장 성분" = "문장성분")
+  3. **IGNORE completely:** Punctuation differences (-, /, :, ., ,, !, ?, etc.)
+  4. **IGNORE completely:** Particles (의, 는, 이, 가, 을, 를, 에, 에서, etc.) and conjunctions (그리고, 또한, 따라서, 하지만, etc.)
+  5. **IGNORE completely:** Case differences in English (CPU = cpu, HTTP = http)
+  6. **IGNORE completely:** Writing style differences (formal vs informal, active vs passive voice)
+  7. **IGNORE completely:** Synonym usage (예를 들어 = 예시로, 중요한 = 핵심적인, 방법 = 방식)
+  8. **IGNORE completely:** Minor grammatical variations (했다 = 하였다, 되다 = 된다)
+  9. **IGNORE completely:** Order differences when listing items (A, B, C vs B, A, C)
+  10. **IGNORE completely:** Abbreviations vs full terms (예: 대한민국 = 한국)
+
+  **ONLY mark as wrong if:**
+  - **Factual errors:** Wrong dates, names, numbers, formulas, concepts
+  - **Contradictory information:** Direct opposite of reference content
+  - **Completely unrelated content:** Content not found anywhere in reference
+  - **Significant conceptual errors:** Fundamental misunderstanding of core concepts
+
+  **Before marking as wrong, ask yourself:**
+  - "Does this convey the same essential meaning as the reference?"
+  - "Is this a minor stylistic difference or a real factual error?"
+  - "Would a reasonable person understand this the same way?"
+
+  **Default to CORRECT unless there's a clear factual error.**
 
   [Reference Document]
   {reference_text}
