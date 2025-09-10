@@ -15,7 +15,7 @@ class MissingAnalysisNodes:
     """
     
     def __init__(self):
-        self.openai_client = OpenAI(api_key=settings.OPENAI_API_KEY_B)
+        self.openai_client = OpenAI(api_key=settings.OPENAI_API_KEY_K)
         self.prompt_loader = PromptLoader()
         self.data_processor = DataProcessor()
         self.mongodb = MongoDB()
