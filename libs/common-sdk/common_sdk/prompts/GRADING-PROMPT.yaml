@@ -15,16 +15,16 @@ template: |
   **Default to correct unless clear factual error.**
 
   **IGNORE completely:**
-  1. Single or two keywords/titles (e.g., "부산", "CPU", "컴퓨팅 자원")
-  2. Spacing differences (e.g., "운영 체제" = "운영체제", "문장 성분" = "문장성분")
-  3. Punctuation differences (-, /, :, ., ,, !, ?, etc.)
-  4. Particles (의, 는, 이, 가, 을, 를, 에, 에서, etc.) and conjunctions (그리고, 또한, 따라서, 하지만, etc.)
-  5. Case differences in English (CPU = cpu, HTTP = http)
-  6. Writing style differences (formal vs informal, active vs passive voice)
-  7. Synonym usage (예를 들어 = 예시로, 중요한 = 핵심적인, 방법 = 방식)
-  8. Minor grammatical variations (했다 = 하였다, 되다 = 된다)
-  9. Order differences when listing items (A, B, C vs B, A, C)
-  10. Abbreviations vs full terms (예: 대한민국 = 한국)
+  1. **Single or two keywords/titles** (e.g., "부산", "CPU", "컴퓨팅 자원")
+  2. **Spacing differences** (e.g., "운영 체제" = "운영체제", "문장 성분" = "문장성분")
+  3. **Punctuation differences** (-, /, :, ., ,, !, ?, etc.)
+  4. **Particles** (의, 는, 이, 가, 을, 를, 에, 에서, etc.) and conjunctions (그리고, 또한, 따라서, 하지만, etc.)
+  5. **Case differences in English** (CPU = cpu, HTTP = http)
+  6. **Writing style differences** (formal vs informal, active vs passive voice)
+  7. **Synonym usage** (예를 들어 = 예시로, 중요한 = 핵심적인, 방법 = 방식)
+  8. **Minor grammatical variations** (했다 = 하였다, 되다 = 된다)
+  9. **Order differences when listing items** (A, B, C vs B, A, C)
+  10. **Abbreviations vs full terms** (예: 대한민국 = 한국)
 
   **ONLY mark as wrong if:**
   - Factual errors (wrong dates/names/numbers/concepts)
