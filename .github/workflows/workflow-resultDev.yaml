@@ -58,8 +58,8 @@ jobs:
           port: ${{ secrets.REMOTE_SSH_PORT }} # 접속포트
           script: | # 실행할 스크립트
             cd ai
-            sudo docker stop ${{ secrets.RESULT_DEV_APPLICATION }}
-            sudo docker rm ${{ secrets.RESULT_DEV_APPLICATION }}
-            sudo docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
-            sudo docker run --name ${{ secrets.RESULT_DEV_APPLICATION }} -d --network ${{ secrets.NETWORK_NAME }} -p 8001:8001 -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} -e AWS_REGION=${{ secrets.AWS_REGION }} -e S3_BUCKET=${{ secrets.S3_BUCKET }} --env-file .env ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
-            sudo docker image prune -a -f
+            docker stop ${{ secrets.RESULT_DEV_APPLICATION }}
+            docker rm ${{ secrets.RESULT_DEV_APPLICATION }}
+            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
+            docker run --name ${{ secrets.RESULT_DEV_APPLICATION }} -d --network ${{ secrets.NETWORK_NAME }} -p 8001:8001 -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} -e AWS_REGION=${{ secrets.AWS_REGION }} -e S3_BUCKET=${{ secrets.S3_BUCKET }} --env-file .env ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
+            docker image prune -a -f
