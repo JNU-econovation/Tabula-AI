@@ -26,9 +26,6 @@ jobs:
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
-      
-      - name: Create ecode_OCR_API.json
-        run: echo "${{ secrets.ECODE_OCR_API_JSON }}" > libs/common-sdk/common_sdk/ecode_OCR_API.json
 
       # Dockerhub 로그인
       - name: Docker Hub Login
@@ -64,5 +61,5 @@ jobs:
             docker stop ${{ secrets.RESULT_DEV_APPLICATION }}
             docker rm ${{ secrets.RESULT_DEV_APPLICATION }}
             docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
-            docker run --name ${{ secrets.RESULT_DEV_APPLICATION }} -d --network ${{ secrets.NETWORK_NAME }} -p 8001:8001 -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} -e AWS_REGION=${{ secrets.AWS_REGION }} -e S3_BUCKET=${{ secrets.S3_BUCKET }} --env-file .env ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
+            docker run --name ${{ secrets.RESULT_DEV_APPLICATION }} -d --network ${{ secrets.NETWORK_NAME }} -p 8001:8001 -v $(pwd)/ecode_OCR_API.json:/app/libs/common-sdk/common_sdk/ecode_OCR_API.json -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} -e AWS_REGION=${{ secrets.AWS_REGION }} -e S3_BUCKET=${{ secrets.S3_BUCKET }} --env-file .env ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
             docker image prune -a -f
