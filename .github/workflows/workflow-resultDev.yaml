@@ -1,0 +1,60 @@
+name: Tabula-AI (Result-Dev CI/CD)
+run-name: '${{ github.event.pull_request.title }}'
+
+# Event: main branch merge
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+    paths:
+      - 'services/result-service/**'
+      - 'libs/result-sdk/**'
+      - 'libs/common-sdk/**'
+
+jobs:
+  build-and-push:
+    name: Build & Push Note Service Docker Image
+    runs-on: ubuntu-latest
+    steps:
+      # Actions: chekcout action3
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Dockerhub 로그인
+      - name: Docker Hub Login
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # Docker build
+      - name: Build Docker Image
+        run: docker buildx build --platform linux/arm64/v8 -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest -f Dockerfile.resultDev .
+  
+      # Docker push
+      - name: Push Docker Image
+        run: docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
+    
+  deploy:
+    name: deploy
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
+
+    steps:
+      - name: Executing remote ssh commands
+        uses: appleboy/ssh-action@v0.1.6 # ssh 접속하는 오픈소스
+        with:
+          host: ${{ secrets.REMOTE_HOST }} # 원격 서버 IP
+          username: ${{ secrets.REMOTE_USERNAME }} # 우분투 아이디
+          key: ${{ secrets.REMOTE_SSH_KEY }}
+          port: ${{ secrets.REMOTE_SSH_PORT }} # 접속포트
+          script: | # 실행할 스크립트
+            cd ai
+            sudo docker stop ${{ secrets.RESULT_DEV_APPLICATION }}
+            sudo docker rm ${{ secrets.RESULT_DEV_APPLICATION }}
+            sudo docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
+            sudo docker run --name ${{ secrets.RESULT_DEV_APPLICATION }} -d —network ${{ secrets.NETWORK_NAME }} -p 8001:8001 -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} -e AWS_REGION=${{ secrets.AWS_REGION }} -e S3_BUCKET=${{ secrets.S3_BUCKET }} --env-file .env ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
+            sudo docker image prune -a -f
