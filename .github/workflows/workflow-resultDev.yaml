@@ -12,12 +12,13 @@ on:
       - 'services/result-service/**'
       - 'libs/result-sdk/**'
       - 'libs/common-sdk/**'
+  workflow_dispatch:
 
 jobs:
   build-and-push:
     name: Build & Push Result Service Docker Image
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     steps:
       # Actions: chekcout action3
       - name: Checkout Code
@@ -42,7 +43,7 @@ jobs:
     name: deploy
     needs: build-and-push
     runs-on: ubuntu-latest
-    if: github.event.pull_request.merged == true
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
 
     steps:
       - name: Executing remote ssh commands
