@@ -15,8 +15,9 @@ on:
 
 jobs:
   build-and-push:
-    name: Build & Push Note Service Docker Image
+    name: Build & Push Result Service Docker Image
     runs-on: ubuntu-latest
+    if: github.event.pull_request.merged == true
     steps:
       # Actions: chekcout action3
       - name: Checkout Code
@@ -56,5 +57,5 @@ jobs:
             sudo docker stop ${{ secrets.RESULT_DEV_APPLICATION }}
             sudo docker rm ${{ secrets.RESULT_DEV_APPLICATION }}
             sudo docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
-            sudo docker run --name ${{ secrets.RESULT_DEV_APPLICATION }} -d —network ${{ secrets.NETWORK_NAME }} -p 8001:8001 -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} -e AWS_REGION=${{ secrets.AWS_REGION }} -e S3_BUCKET=${{ secrets.S3_BUCKET }} --env-file .env ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
+            sudo docker run --name ${{ secrets.RESULT_DEV_APPLICATION }} -d --network ${{ secrets.NETWORK_NAME }} -p 8001:8001 -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} -e AWS_REGION=${{ secrets.AWS_REGION }} -e S3_BUCKET=${{ secrets.S3_BUCKET }} --env-file .env ${{ secrets.DOCKER_USERNAME }}/${{ secrets.RESULT_DEV_APPLICATION }}:latest
             sudo docker image prune -a -f
