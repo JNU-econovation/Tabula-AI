@@ -130,6 +130,7 @@ if __name__ == '__main__':
     parser.add_argument(
         "--input_file",
         default='/Users/ki/Desktop/Google Drive/Dev/Ecode/OCR_Test/예시_한국사.pdf',
+        #default='/Users/ki/Desktop/test1.pdf',
         help="Path to the PDF or image file to process for testing."
     )
     parser.add_argument(
