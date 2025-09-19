@@ -1,26 +1,32 @@
 name: Tabula-AI (Note-Dev CI/CD)
 run-name: '${{ github.event.pull_request.title }}'
 
-# Event: develop branch merge
+# Event: main branch merge
 on:
   pull_request:
     branches:
-      - develop
+      - main
     types:
       - closed
     paths:
       - 'services/note-service/**'
       - 'libs/note-sdk/**'
       - 'libs/common-sdk/**'
+  workflow_dispatch:
 
 jobs:
   build-and-push:
     name: Build & Push Note Service Docker Image
     runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
     steps:
       # Actions: chekcout action3
       - name: Checkout Code
         uses: actions/checkout@v3
+      
+      # 플랫폼 불일치 문제 해결을 위해 QEMU 설치
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
       # Dockerhub 로그인
       - name: Docker Hub Login
@@ -31,33 +37,31 @@ jobs:
 
       # Docker build
       - name: Build Docker Image
-        run: docker buildx build --platform linux/amd64 -f Dockerfile.noteDev -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.NOTE_DEV_APPLICATION }}:latest .
+        run: docker buildx build --platform linux/arm64/v8 -t ${{ secrets.DOCKER_USERNAME }}/${{ secrets.NOTE_DEV_APPLICATION }}:latest -f Dockerfile.noteDev .
   
       # Docker push
       - name: Push Docker Image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/${{ secrets.NOTE_DEV_APPLICATION }}:latest
     
   deploy:
-    name: Deploy on AWS EC2 Server(Dev)
+    name: deploy
     needs: build-and-push
     runs-on: ubuntu-latest
-    steps:
-      # chekcout action의 3 버전을 Actions으로써 실행
-      - name: Checkout Code
-        uses: actions/checkout@v3
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.merged == true
 
-      # AWS EC2 연결 및 배포
-      - name: Connect to AWS EC2 and Deploy
-        uses: appleboy/ssh-action@v1.0.3
+    steps:
+      # 라즈베리 파이 서버 연결 및 배포
+      - name: Executing remote ssh commands
+        uses: appleboy/ssh-action@v0.1.6
         with:
-          host: ${{ secrets.DEV_AWS_HOST }}
-          username: ${{ secrets.DEV_AWS_USER }}
-          key: ${{ secrets.DEV_AWS_PRIVATE_KEY }}
-          # 기존 AWS EC2 서버에서 수행한 명령어 작성
+          host: ${{ secrets.REMOTE_HOST }} # 원격 서버 IP
+          username: ${{ secrets.REMOTE_USERNAME }} # 우분투 아이디
+          key: ${{ secrets.REMOTE_SSH_KEY }}
+          port: ${{ secrets.REMOTE_SSH_PORT }} # 접속포트
           script: |
             cd ai
-            sudo docker stop ${{ secrets.NOTE_DEV_APPLICATION }}
-            sudo docker rm ${{ secrets.NOTE_DEV_APPLICATION }}
-            sudo docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.NOTE_DEV_APPLICATION }}:latest
-            sudo docker run -d -p 8000:8000 --name ${{ secrets.NOTE_DEV_APPLICATION }} --env-file .env.dev ${{ secrets.DOCKER_USERNAME }}/${{ secrets.NOTE_DEV_APPLICATION }}:latest
-            sudo docker image prune -a -f
+            docker stop ${{ secrets.NOTE_DEV_APPLICATION }}
+            docker rm ${{ secrets.NOTE_DEV_APPLICATION }}
+            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.NOTE_DEV_APPLICATION }}:latest
+            docker run --name ${{ secrets.NOTE_DEV_APPLICATION }} -d --network ${{ secrets.NETWORK_NAME }} -p 8001:8001 -e AWS_ACCESS_KEY_ID=${{ secrets.AWS_ACCESS_KEY_ID }} -e AWS_SECRET_ACCESS_KEY=${{ secrets.AWS_SECRET_ACCESS_KEY }} -e AWS_REGION=${{ secrets.AWS_REGION }} -e S3_BUCKET=${{ secrets.S3_BUCKET }} --env-file .env ${{ secrets.DOCKER_USERNAME }}/${{ secrets.NOTE_DEV_APPLICATION }}:latest
+            docker image prune -a -f
