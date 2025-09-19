@@ -1,5 +1,5 @@
 # Python 3.11 이미지 사용
-FROM --platform=linux/amd64 python:3.11-slim
+FROM --platform=linux/arm64/v8 python:3.11-slim
 
 # 작업 디렉토리 설정
 WORKDIR /app
