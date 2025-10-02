@@ -34,7 +34,18 @@ def ocr_image(file_path: str, service_account_file: str) -> dict:
     except Exception as e:
         raise IOError(f"OCR 이미지 파일 로딩 중 오류: {e}")
 
-    request_payload = {"requests": [{"image": {"content": content}, "features": [{"type": "DOCUMENT_TEXT_DETECTION"}]}]}
+    # 손글씨 인식 정확도 향상을 위해 language_hints 추가
+    image_context = {"language_hints": ["ko", "en"]}
+    
+    request_payload = {
+        "requests": [
+            {
+                "image": {"content": content},
+                "features": [{"type": "DOCUMENT_TEXT_DETECTION"}],
+                "imageContext": image_context
+            }
+        ]
+    }
     
     try:
         response = requests.post(VISION_API_URL, headers=headers, data=json.dumps(request_payload))
