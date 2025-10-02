@@ -130,8 +130,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Accuracy Test Script for OCR-LLM Pipeline")
     parser.add_argument(
         "--input_file",
-        #default='/Users/ki/Desktop/Google Drive/Dev/Ecode/OCR_Test/예시_한국사.pdf',
-        #default='/Users/ki/Desktop/test1.pdf',
         default='/Users/ki/Downloads/CleanShot 2025-09-17 at 14.16.23@2x.png',
         help="Path to the PDF or image file to process for testing."
     )

@@ -60,6 +60,11 @@ class Settings:
         # LLM 모델 이름을 .env 파일에서 관리하도록 수정
         self.LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-2.5-flash-lite-preview-06-17")
 
+        # --- Document AI 설정 ---
+        self.DOCAI_PROJECT_ID = os.getenv("DOCAI_PROJECT_ID")
+        self.DOCAI_LOCATION = os.getenv("DOCAI_LOCATION")
+        self.DOCAI_PROCESSOR_ID = os.getenv("DOCAI_PROCESSOR_ID")
+
         # --- Pinecone 인덱스 이름 설정 ---
         self.INDEX_NAME_KOR_DEN_CONTENTS = os.getenv("INDEX_NAME_KOR_DEN_CONTENTS")
         self.INDEX_NAME_KOR_SPA_CONTENTS = os.getenv("INDEX_NAME_KOR_SPA_CONTENTS")
@@ -100,6 +105,9 @@ class Settings:
         # --- 기타 기본값 ---
         self.DEFAULT_PDF_CONVERT_TEMP_SUBDIR_NAME = "pdf_pages"
         self.DEFAULT_UNDERLINE_OUTPUT_SUBDIR_NAME = "visualized_outputs"
+        
+        # 페이지당 병렬 LLM 호출 수 (기본값: 2)
+        self.MAX_PARALLEL_LLM_CALLS_PER_PAGE = int(os.getenv("MAX_PARALLEL_LLM_CALLS_PER_PAGE", 2))
 
 # 설정 객체 인스턴스화
 settings = Settings()
