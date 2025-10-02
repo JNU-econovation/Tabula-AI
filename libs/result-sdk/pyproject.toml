@@ -22,6 +22,7 @@ google-auth = "^2.29.0"
 pdf2image = "^1.17.0"
 pytest-mock = "^3.14.1"
 openai = "1.99.2"
+google-cloud-documentai = "^2.29.1"
 
 
 [build-system]

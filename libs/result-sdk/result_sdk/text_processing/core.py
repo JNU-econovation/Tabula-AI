@@ -19,7 +19,10 @@ from common_sdk.prompt_loader import PromptLoader
 # 현재 패키지(text_processing) 내의 모듈들을 가져옵니다.
 from .input_handler import get_image_paths_from_input
 from .OCR_Processor import (
-    ocr_image, parse_raw_words, find_vertical_split_point, assign_ids_after_split
+    process_document_ocr,
+    parse_docai_raw_words,
+    find_vertical_split_point, 
+    assign_ids_after_split
 )
 from .LLM_interaction import (
     format_ocr_results_for_prompt, build_full_prompt, get_llm_response, process_llm_and_integrate
@@ -139,10 +142,20 @@ def process_document(
         page_num = page_idx + 1
         print(f"\n\n[Processing Page {page_num}/{len(image_files_to_process)}] File: {os.path.basename(image_file_path)}")
         
-        print(f"  [Page {page_num}] Step 1: Running OCR")
+        print(f"  [Page {page_num}] Step 1: Running OCR with Document AI")
         try:
-            response_json = ocr_image(image_file_path, service_account_file)
-            raw_words = parse_raw_words(response_json)
+            if not all([config.settings.DOCAI_PROJECT_ID, config.settings.DOCAI_LOCATION, config.settings.DOCAI_PROCESSOR_ID]):
+                raise ValueError("Document AI settings (DOCAI_PROJECT_ID, DOCAI_LOCATION, DOCAI_PROCESSOR_ID) are not configured in your .env file.")
+            
+            response_dict = process_document_ocr(
+                file_path=image_file_path,
+                service_account_file=service_account_file,
+                project_id=config.settings.DOCAI_PROJECT_ID,
+                location=config.settings.DOCAI_LOCATION,
+                processor_id=config.settings.DOCAI_PROCESSOR_ID
+            )
+            raw_words = parse_docai_raw_words(response_dict)
+
             if not raw_words:
                 print(f"    [Warning] Page {page_num}: No words found in OCR result. Skipping to next page.")
                 continue

@@ -1,81 +1,93 @@
 """
-OCR API 활용 및 중앙 분할 알고리즘 모듈
-Google Cloud Vision API를 사용해 이미지에서 텍스트를 추출하고,
-텍스트 분포를 기반으로 좌우 블록을 나눈 뒤 ID를 할당함
+Google Document AI를 활용한 OCR 처리 모듈
 """
 
-import json
-import requests
-import base64
-from google.oauth2 import service_account
-import google.auth.transport.requests
+import os
+from google.cloud import documentai
+from google.api_core.client_options import ClientOptions
 
-def ocr_image(file_path: str, service_account_file: str) -> dict:
-    """Google Cloud Vision API를 호출하여 이미지에서 텍스트 추출"""
-    try:
-        credentials = service_account.Credentials.from_service_account_file(
-            service_account_file,
-            scopes=["https://www.googleapis.com/auth/cloud-platform"],
-        )
-        auth_req = google.auth.transport.requests.Request()
-        credentials.refresh(auth_req)
-        access_token = credentials.token
-    except Exception as e:
-        raise ValueError(f"서비스 계정 파일 또는 인증 오류: {e}")
-
-    VISION_API_URL = "https://vision.googleapis.com/v1/images:annotate"
-    headers = {"Authorization": f"Bearer {access_token}", "Content-Type": "application/json"}
+def process_document_ocr(
+    file_path: str,
+    project_id: str,
+    location: str,
+    processor_id: str,
+    service_account_file: str,
+) -> dict:
+    """Google Document AI를 호출하여 이미지에서 텍스트를 추출합니다."""
     
+    # Document AI 클라이언트 옵션 설정 (서비스 계정 파일 사용)
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = service_account_file
+    opts = ClientOptions(api_endpoint=f"{location}-documentai.googleapis.com")
+    client = documentai.DocumentProcessorServiceClient(client_options=opts)
+
+    name = client.processor_path(project_id, location, processor_id)
+
     try:
-        with open(file_path, "rb") as image_file:
-            content = base64.b64encode(image_file.read()).decode("utf-8")
+        with open(file_path, "rb") as image:
+            image_content = image.read()
     except FileNotFoundError:
         raise FileNotFoundError(f"OCR 이미지 파일을 찾을 수 없음: {file_path}")
     except Exception as e:
         raise IOError(f"OCR 이미지 파일 로딩 중 오류: {e}")
 
-    request_payload = {"requests": [{"image": {"content": content}, "features": [{"type": "DOCUMENT_TEXT_DETECTION"}]}]}
-    
+    # Document AI에 처리할 문서 요청
+    raw_document = documentai.RawDocument(
+        content=image_content, mime_type="application/pdf" if file_path.lower().endswith(".pdf") else "image/jpeg"
+    )
+
+    request = documentai.ProcessRequest(name=name, raw_document=raw_document)
+
     try:
-        response = requests.post(VISION_API_URL, headers=headers, data=json.dumps(request_payload))
-        response.raise_for_status() # HTTP 오류 시 예외 발생
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        raise ConnectionError(f"Vision API 요청 중 네트워크 오류: {e}")
+        result = client.process_document(request=request)
+        document = result.document
+        # OCR 결과를 JSON 직렬화 가능한 형태로 변환하여 반환 (필요시 구조 수정)
+        return documentai.Document.to_dict(document)
     except Exception as e:
-        raise RuntimeError(f"Vision API 응답 처리 중 기타 오류: {e}")
+        raise ConnectionError(f"Document AI API 요청 중 오류 발생: {e}")
 
-def parse_raw_words(response_json: dict) -> list:
-    """OCR API 응답을 파싱하여 단어 목록과 좌표 추출"""
-    if not response_json.get('responses') or not response_json['responses'][0]:
-        print("Warning: Received empty or invalid response from OCR API")
-        return []
-    
-    texts = response_json['responses'][0].get('textAnnotations')
-    if not texts:
-        return [] # 텍스트 없는 이미지일 수 있음
-        
+def parse_docai_raw_words(docai_response: dict) -> list:
+    """Document AI 응답을 파싱하여 단어 목록과 좌표를 추출합니다."""
     raw_words = []
-    for word_info in texts[1:]: # texts[0]은 전체 텍스트, [1:]부터 개별 단어
-        text = word_info.get('description', '').strip()
-        if not text: 
-            continue
-        
-        vertices = word_info.get('boundingPoly', {}).get('vertices', [])
-        if not vertices or len(vertices) < 4:
-            continue
+    
+    # Document AI 응답 구조에 따라 텍스트와 바운딩 박스 정보 추출
+    # 페이지, 블록, 문단, 줄, 토큰(단어) 계층 구조를 가짐
+    for page in docai_response.get("pages", []):
+        # 페이지 크기 정보
+        page_width = page.get("dimension", {}).get("width", 1)
+        page_height = page.get("dimension", {}).get("height", 1)
 
-        x_list = [v.get('x', 0) for v in vertices]
-        y_list = [v.get('y', 0) for v in vertices]
-        
-        raw_words.append({
-            "text": text, 
-            "x1": min(x_list) if x_list else 0, 
-            "y1": min(y_list) if y_list else 0, 
-            "x2": max(x_list) if x_list else 0, 
-            "y2": max(y_list) if y_list else 0, 
-            "bounding_box": vertices
-        })
+        for token in page.get("tokens", []):
+            # Document AI 응답에서 텍스트 추출
+            text_segments = token.get("layout", {}).get("text_anchor", {}).get("text_segments", [])
+            if not text_segments:
+                continue
+            
+            # text_segments를 사용하여 전체 텍스트에서 해당 토큰의 텍스트를 가져옴
+            start_index = int(text_segments[0].get("start_index", 0))
+            end_index = int(text_segments[0].get("end_index", 0))
+            text = docai_response.get("text", "")[start_index:end_index].strip()
+
+            if not text:
+                continue
+
+            vertices = token.get("layout", {}).get("bounding_poly", {}).get("vertices", [])
+            if not vertices or len(vertices) < 4:
+                continue
+            
+            # Document AI는 정규화된 좌표(0~1)를 반환하지 않고 바로 픽셀 좌표를 제공합니다.
+            # 따라서 별도의 변환이 필요 없습니다.
+            x_list = [v.get("x", 0) for v in vertices]
+            y_list = [v.get("y", 0) for v in vertices]
+
+            raw_words.append({
+                "text": text,
+                "x1": min(x_list),
+                "y1": min(y_list),
+                "x2": max(x_list),
+                "y2": max(y_list),
+                "bounding_box": vertices
+            })
+            
     return raw_words
 
 def find_vertical_split_point(words: list, image_width: int) -> int:
@@ -168,15 +180,16 @@ def assign_ids_after_split(raw_words: list, split_x: int, page_num: int) -> list
     processed_results.sort(key=lambda w: (w.get('page_num', 0), w.get('block_id', 0), w.get('y_idx', 0), w.get('x_idx', 0)))
     return processed_results
 
-def display_ocr_results(ocr_results_list: list):
-    """ID 할당된 OCR 결과를 디버깅용으로 출력"""
-    for item in ocr_results_list:
-        print(f"ID({item.get('page_num')},{item.get('block_id')},{item.get('y_idx')},{item.get('x_idx')}): {item.get('text')}")
-
 if __name__ == '__main__':
     # 모듈 직접 실행 시 테스트용 코드
     # 예:
-    # dummy_response = { ... } # Vision API 응답과 유사한 더미 데이터
-    # raw_words = parse_raw_words(dummy_response)
-    # ... (이하 테스트 로직)
+    # project_id = "your-gcp-project-id"
+    # location = "us"  # e.g., "us" or "eu"
+    # processor_id = "your-processor-id"
+    # file_path = "path/to/your/image.jpg"
+    # service_account_file = "path/to/your/service-account.json"
+    #
+    # docai_result = process_document_ocr(file_path, project_id, location, processor_id, service_account_file)
+    # words = parse_docai_raw_words(docai_result)
+    # print(words)
     pass
