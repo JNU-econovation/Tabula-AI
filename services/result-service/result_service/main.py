@@ -21,7 +21,7 @@ app = FastAPI(
 # CORS
 origins = [
     "http://localhost:3000",
-    # Front Deploy URL
+    "https://tabula.co.kr"
 ]
 app.add_middleware(
     CORSMiddleware,

@@ -1,109 +1,97 @@
+"""
+result-sdk 설정 관리 모듈
+환경 변수, API 키, 경로 등 애플리케이션 전반의 설정을 관리함
+"""
+
 import os
 from dotenv import load_dotenv
-from pathlib import Path # Add Path import
+from pathlib import Path
 
-# Attempt to import Google AI types for safety settings
+# Google AI 유형 임포트 시도 (안전 설정용)
 try:
     from google.generativeai.types import HarmCategory, HarmBlockThreshold
 except ImportError:
-    print("Warning: 'google.generativeai.types'를 찾을 수 없습니다. SAFETY_SETTINGS에 대한 기본값을 문자열로 사용하거나 라이브러리를 확인하세요.")
+    print("Warning: 'google.generativeai.types' could not be found. Using default values for SAFETY_SETTINGS.")
     HarmCategory = None
     HarmBlockThreshold = None
 
-# 경로 설정: result-sdk
-RESULT_SDK_ROOT = Path(os.path.dirname(__file__)) # Use Path for easier manipulation
-
-# Determine APP_ENV to load the correct .env file from common-sdk
-# This APP_ENV is primarily for selecting the .env file.
-# The Settings class will also read it for other path configurations.
-APP_ENV_FOR_DOTENV = os.getenv("APP_ENV", "development").lower()
-
-# 경로 설정: common-sdk
+# --- 경로 설정 ---
+RESULT_SDK_ROOT = Path(__file__).parent.resolve()
 COMMON_SDK_CONFIG_DIR = RESULT_SDK_ROOT.parent.parent / 'common-sdk' / 'common_sdk'
 
-dotenv_path_to_load = None
-if APP_ENV_FOR_DOTENV == "development":
-    dotenv_path_to_load = COMMON_SDK_CONFIG_DIR / '.env.dev'
-elif APP_ENV_FOR_DOTENV == "test":
-    dotenv_path_to_load = COMMON_SDK_CONFIG_DIR / '.env.test'
-elif APP_ENV_FOR_DOTENV == "production":
-    # For production, env vars are often set directly in the environment.
-    # If a specific .env.prod file is used, its path should be specified here.
-    # Attempting to load a generic .env from common-sdk as a fallback.
-    dotenv_path_to_load = COMMON_SDK_CONFIG_DIR / '.env' 
-else:  # Staging or unknown environment
-    print(f"Warning: Unknown APP_ENV '{APP_ENV_FOR_DOTENV}' for selecting .env file. Defaulting to load '.env.dev' from common-sdk.")
-    dotenv_path_to_load = COMMON_SDK_CONFIG_DIR / '.env.dev' # Default to .env.dev
+# --- .env 파일 로드 ---
+# APP_ENV 환경 변수를 기반으로 적절한 .env 파일 로드
+APP_ENV = os.getenv("APP_ENV", "development").lower()
 
-if dotenv_path_to_load and dotenv_path_to_load.exists():
-    load_dotenv(dotenv_path_to_load)
-    print(f"INFO: Loaded environment variables from: {dotenv_path_to_load}")
+dotenv_path = None
+if APP_ENV == "development":
+    dotenv_path = COMMON_SDK_CONFIG_DIR / '.env.dev'
+elif APP_ENV == "test":
+    dotenv_path = COMMON_SDK_CONFIG_DIR / '.env.test'
+elif APP_ENV == "production":
+    # 프로덕션 환경에서는 보통 환경 변수를 직접 설정
+    dotenv_path = COMMON_SDK_CONFIG_DIR / '.env' 
 else:
-    # If the specific .env file (e.g. .env.dev for development) is not found,
-    # try loading a generic .env from common-sdk as a general fallback.
-    generic_common_sdk_dotenv_path = COMMON_SDK_CONFIG_DIR / '.env'
-    if dotenv_path_to_load != generic_common_sdk_dotenv_path and generic_common_sdk_dotenv_path.exists():
-        load_dotenv(generic_common_sdk_dotenv_path)
-        print(f"INFO: Loaded environment variables from generic common-sdk .env: {generic_common_sdk_dotenv_path}")
-    else:
-        if dotenv_path_to_load:
-            print(f"WARNING: Environment file not found at {dotenv_path_to_load}. Also, generic common-sdk .env not found or already checked.")
-        else: # Should not happen with current logic, but as a safeguard
-            print(f"WARNING: dotenv_path_to_load was not set. Generic common-sdk .env not found.")
-        print("Relying on system environment variables. Ensure GOOGLE_API_KEY and other critical variables are set if not found.")
+    print(f"Warning: Unknown APP_ENV '{APP_ENV}'. Defaulting to '.env.dev'.")
+    dotenv_path = COMMON_SDK_CONFIG_DIR / '.env.dev'
+
+if dotenv_path and dotenv_path.exists():
+    load_dotenv(dotenv_path)
+    print(f"INFO: Loaded environment variables from: {dotenv_path}")
+else:
+    print(f"WARNING: Dotenv file not found at {dotenv_path}. Relying on system environment variables.")
 
 class Settings:
+    """애플리케이션 설정을 담는 클래스"""
     def __init__(self):
-
-        # Pinecone 설정
+        # --- API 키 및 외부 서비스 설정 ---
         self.PINECONE_API_KEY = os.getenv("PINECONE_API_KEY")
+        self.GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+        
+        # 서비스 계정 파일 경로를 절대 경로로 변환
+        service_account_path = os.getenv("SERVICE_ACCOUNT_FILE_PATH")
+        if service_account_path and not os.path.isabs(service_account_path):
+            # 프로젝트 루트는 이 파일 위치(libs/result-sdk/result_sdk)에서 3단계 위
+            project_root = Path(__file__).parent.parent.parent.parent.resolve()
+            self.SERVICE_ACCOUNT_FILE = str(project_root / service_account_path)
+        else:
+            self.SERVICE_ACCOUNT_FILE = service_account_path
+        
+        # LLM 모델 이름을 .env 파일에서 관리하도록 수정
+        self.LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-2.5-flash-lite-preview-06-17")
+
+        # --- Document AI 설정 ---
+        self.DOCAI_PROJECT_ID = os.getenv("DOCAI_PROJECT_ID")
+        self.DOCAI_LOCATION = os.getenv("DOCAI_LOCATION")
+        self.DOCAI_PROCESSOR_ID = os.getenv("DOCAI_PROCESSOR_ID")
+
+        # --- Pinecone 인덱스 이름 설정 ---
         self.INDEX_NAME_KOR_DEN_CONTENTS = os.getenv("INDEX_NAME_KOR_DEN_CONTENTS")
-        self.INDEX_NAME_ENG_DEN_CONTENTS = os.getenv("INDEX_NAME_ENG_DEN_CONTENTS")
         self.INDEX_NAME_KOR_SPA_CONTENTS = os.getenv("INDEX_NAME_KOR_SPA_CONTENTS")
+        self.INDEX_NAME_ENG_DEN_CONTENTS = os.getenv("INDEX_NAME_ENG_DEN_CONTENTS")
         self.INDEX_NAME_ENG_SPA_CONTENTS = os.getenv("INDEX_NAME_ENG_SPA_CONTENTS")
 
-        # OpenAI 설정
-        self.OPENAI_API_KEY_J = os.getenv("OPENAI_API_KEY_J")
-        self.OPENAI_API_KEY_K = os.getenv("OPENAI_API_KEY_K")
-        self.OPENAI_API_KEY_B = os.getenv("OPENAI_API_KEY_B")
-
-        # --- Settings from former kiwi/config.py ---
-        self.APP_ENV = os.getenv("APP_ENV", "development").lower()
-        self.GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-        self.SERVICE_ACCOUNT_FILE = os.getenv("SERVICE_ACCOUNT_FILE_PATH")
-        self.LLM_MODEL_NAME = os.getenv("LLM_MODEL_NAME", "gemini-1.5-flash-latest")
-
-        # Path configurations based on APP_ENV
-        # Using RESULT_SDK_ROOT as the base for development paths.
-        # For production, paths are typically absolute and set via environment variables.
-        project_root_for_dev_paths = RESULT_SDK_ROOT
-
-        if self.APP_ENV == "production":
-            self.BASE_INPUT_DIR = os.getenv("PROD_INPUT_DIR", "/srv/app/ocr_inputs")
-            self.BASE_OUTPUT_DIR = os.getenv("PROD_OUTPUT_DIR", "/srv/app/ocr_outputs")
-            self.BASE_TEMP_DIR = os.getenv("PROD_TEMP_DIR", "/tmp/ocr_processing_temp")
+        # --- 경로 설정 ---
+        # APP_ENV에 따라 다른 기본 경로 설정
+        if APP_ENV == "production":
+            self.BASE_INPUT_DIR = os.getenv("PROD_INPUT_DIR", "/srv/app/inputs")
+            self.BASE_OUTPUT_DIR = os.getenv("PROD_OUTPUT_DIR", "/srv/app/outputs")
+            self.BASE_TEMP_DIR = os.getenv("PROD_TEMP_DIR", "/tmp/processing_temp")
+        else: # development, test 등 다른 환경
+            self.BASE_INPUT_DIR = os.getenv("DEV_INPUT_DIR", str(RESULT_SDK_ROOT / "sample_inputs"))
+            self.BASE_OUTPUT_DIR = os.getenv("DEV_OUTPUT_DIR", str(RESULT_SDK_ROOT / "local_outputs"))
+            self.BASE_TEMP_DIR = os.getenv("DEV_TEMP_DIR", str(RESULT_SDK_ROOT / "local_temp"))
+            # 개발 환경용 서비스 계정 파일 경로 (필요 시 .env 파일에 정의)
             if not self.SERVICE_ACCOUNT_FILE:
-                print("경고: 프로덕션 환경 SERVICE_ACCOUNT_FILE_PATH 환경 변수가 설정되지 않았습니다.")
-        elif self.APP_ENV == "development":
-            self.BASE_INPUT_DIR = os.getenv("DEV_INPUT_DIR", os.path.join(project_root_for_dev_paths, "sample_inputs"))
-            self.BASE_OUTPUT_DIR = os.getenv("DEV_OUTPUT_DIR", os.path.join(project_root_for_dev_paths, "local_outputs"))
-            self.BASE_TEMP_DIR = os.getenv("DEV_TEMP_DIR", os.path.join(project_root_for_dev_paths, "local_temp"))
-            if not self.SERVICE_ACCOUNT_FILE:
-                # Fallback for local development, ideally this path should also be in .env
-                self.SERVICE_ACCOUNT_FILE = os.getenv("LOCAL_DEV_SERVICE_ACCOUNT_FALLBACK", "/Users/ki/Desktop/Google Drive/Dev/Ecode/ecode-458109-73d063ae5f2a.json")
-        else:  # Staging or unknown environment
-            print(f"경고: 알 수 없는 APP_ENV '{self.APP_ENV}'. 개발 환경 설정을 사용합니다.")
-            self.BASE_INPUT_DIR = os.getenv("DEV_INPUT_DIR", os.path.join(project_root_for_dev_paths, "sample_inputs"))
-            self.BASE_OUTPUT_DIR = os.getenv("DEV_OUTPUT_DIR", os.path.join(project_root_for_dev_paths, "local_outputs"))
-            self.BASE_TEMP_DIR = os.getenv("DEV_TEMP_DIR", os.path.join(project_root_for_dev_paths, "local_temp"))
-            if not self.SERVICE_ACCOUNT_FILE:
-                self.SERVICE_ACCOUNT_FILE = os.getenv("LOCAL_DEV_SERVICE_ACCOUNT_FALLBACK", "/Users/ki/Desktop/Google Drive/Dev/Ecode/ecode-458109-73d063ae5f2a.json")
+                self.SERVICE_ACCOUNT_FILE = os.getenv("LOCAL_DEV_SERVICE_ACCOUNT_FALLBACK")
 
+        # --- LLM 생성 설정 ---
         self.GENERATION_CONFIG = {
             "temperature": 0.2,
-            "max_output_tokens": 8192  # Gemini 1.5 Flash max
+            # "max_output_tokens": 8192, # 필요 시 설정
         }
 
+        # --- LLM 안전 설정 ---
         if HarmCategory and HarmBlockThreshold:
             self.SAFETY_SETTINGS = [
                 {"category": HarmCategory.HARM_CATEGORY_HARASSMENT, "threshold": HarmBlockThreshold.BLOCK_NONE},
@@ -112,23 +100,21 @@ class Settings:
                 {"category": HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, "threshold": HarmBlockThreshold.BLOCK_NONE},
             ]
         else:
-            print("Warning: HarmCategory 또는 HarmBlockThreshold를 import 할 수 없어 SAFETY_SETTINGS를 기본값(None)으로 설정합니다.")
             self.SAFETY_SETTINGS = None
         
+        # --- 기타 기본값 ---
         self.DEFAULT_PDF_CONVERT_TEMP_SUBDIR_NAME = "pdf_pages"
         self.DEFAULT_UNDERLINE_OUTPUT_SUBDIR_NAME = "visualized_outputs"
+        
+        # 페이지당 병렬 LLM 호출 수 (기본값: 2)
+        self.MAX_PARALLEL_LLM_CALLS_PER_PAGE = int(os.getenv("MAX_PARALLEL_LLM_CALLS_PER_PAGE", 2))
 
+# 설정 객체 인스턴스화
 settings = Settings()
 
-# 애플리케이션 실행 시 필요한 기본 디렉토리 자동 생성 (선택 사항)
-# Ensure paths are valid before creating
-if hasattr(settings, 'BASE_OUTPUT_DIR') and settings.BASE_OUTPUT_DIR:
+# --- 애플리케이션 시작 시 디렉토리 생성 ---
+# 설정된 경로가 유효한 경우, 기본 출력 및 임시 디렉토리를 미리 생성
+if settings.BASE_OUTPUT_DIR:
     os.makedirs(settings.BASE_OUTPUT_DIR, exist_ok=True)
-if hasattr(settings, 'BASE_TEMP_DIR') and settings.BASE_TEMP_DIR:
+if settings.BASE_TEMP_DIR:
     os.makedirs(settings.BASE_TEMP_DIR, exist_ok=True)
-
-# 인덱스 목록 확인 (commented out as in original)
-# from pinecone import Pinecone
-# pc = Pinecone(api_key=settings.PINECONE_API_KEY)
-# indexes = pc.list_indexes()
-# print([idx.name for idx in indexes.indexes])

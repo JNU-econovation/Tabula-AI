@@ -291,7 +291,7 @@ class PineconeSearcher:
                 self.logger.error(f"Failed to parse imageReferences JSON: {image_references_str}")
                 return text_content
             
-            # 이미지 콘텐츠 조회 (병렬로 처리)
+            # 이미지 콘텐츠 조회
             image_tasks = []
             for image_ref in image_references:
 
@@ -387,7 +387,7 @@ class BM25Manager:
         return self.encoder
     
 class DocumentFinder:
-    """문서 검색을 위한 통합 클래스 (비동기 지원)"""
+    """문서 검색을 위한 통합 클래스"""
     
     def __init__(self, language: str = "korean"):
         self.pinecone_searcher = PineconeSearcher(language)
@@ -404,17 +404,16 @@ class DocumentFinder:
         config: RetrievalConfig,
         language: str = "korean"
     ) -> Optional[str]:
-        """참고 텍스트 검색 (비동기)"""
+        """참고 텍스트 검색 (비동기 / Dense)"""
         try:
-            response = await self.pinecone_searcher.hybrid_search(
+            dense_results = await self.pinecone_searcher.dense_search(
                 query=query,
                 config=config,
-                bm25_encoder=self.bm25_manager.get_encoder(),
                 language=language
             )
             
-            if response.matches and len(response.matches) > 0:
-                return response.matches[0].content
+            if dense_results and len(dense_results) > 0:
+                return dense_results[0].content
             
             return None
             

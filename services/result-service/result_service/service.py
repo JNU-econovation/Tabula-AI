@@ -40,8 +40,9 @@ class ResultService:
         self.png_files: List[str] = []
         self.origin_urls: List[Dict] = []
         self.ocr_results: List[str] = [] # GradingService 입력용 (JSON 문자열화된 RAG 데이터)
-        self.all_consolidated_data: List[Dict] = [] # process_document 결과 (시각화용)
-        self.all_rag_ready_data: List[List[Any]] = [] # process_document 결과 (시각화 및 채점 입력용)
+        self.all_visualization_data: List[Dict] = [] # process_document 결과 (시각화용)
+        self.all_rag_ready_data: List[List[Any]] = [] # process_document 결과 (채점 입력용)
+        self.all_original_ocr_data: List[Dict] = [] # process_document 결과 (시각화용)
         self.wrong_answers: List[Dict] = []
         self.wrong_answer_ids: List[List[int]] = [] # draw_underlines_for_incorrect_answers_enhanced 입력용
         self.missing_answers: List[str] = []
@@ -115,7 +116,7 @@ class ResultService:
             for highlight_data in self.highlight_urls:
                 results_array.append({
                     "id": highlight_data.get("id"),
-                    "resultImageUrl": highlight_data.get("url", "")
+                    "postImageUrl": highlight_data.get("url", "")
                 })
 
             results_array.sort(key=lambda x: x["id"])
@@ -161,6 +162,8 @@ class ResultService:
     async def convert_pdf_to_png(self):
         """PDF → PNG 분리 또는 PNG 파일들 정리"""
         try:
+            self.png_files = []
+            
             # 여러 파일이 업로드된 경우
             if len(self.file_paths) > 1:
                 logger.info(f"Result: {self.result_id} - Multiple PNG files provided: {len(self.file_paths)} files")
@@ -272,7 +275,9 @@ class ResultService:
                 logger.error(f"Result: {self.result_id} - Failed to load OCR-PROMPT via PromptLoader: {e_prompt}", exc_info=True)
                 loaded_prompt_template = "Error loading prompt. OCR Data: {ocr_chunk_list_placeholder}"
 
-            processed_data = process_document(
+            # process_document를 별도 스레드에서 실행하여 비동기 처리
+            processed_data_tuple = await asyncio.to_thread(
+                process_document,
                 input_file_path=input_for_processing,
                 service_account_file=result_sdk_settings.SERVICE_ACCOUNT_FILE,
                 temp_base_dir=result_sdk_settings.BASE_TEMP_DIR,
@@ -282,7 +287,7 @@ class ResultService:
                 pre_converted_image_paths=self.png_files # 이미 변환된 PNG 파일 경로 전달
             )
             
-            self.all_consolidated_data, self.all_rag_ready_data, image_files_actually_used, _ = processed_data
+            self.all_visualization_data, self.all_rag_ready_data, self.all_original_ocr_data, image_files_actually_used, _ = processed_data_tuple
 
             if image_files_actually_used and not self.png_files:
                 logger.warning(f"Result: {self.result_id} - self.png_files was empty but process_document returned image paths. This is unexpected.")
@@ -292,7 +297,7 @@ class ResultService:
 
             self.ocr_results = json.dumps(self.all_rag_ready_data, ensure_ascii=False) if self.all_rag_ready_data else "[]"
             
-            logger.info(f"Result: {self.result_id} - OCR + LLM processing completed. Consolidated items: {len(self.all_consolidated_data)}, RAG items: {len(self.all_rag_ready_data)}")
+            logger.info(f"Result: {self.result_id} - OCR + LLM processing completed. Visualization items: {len(self.all_visualization_data)}, RAG items: {len(self.all_rag_ready_data)}, Original OCR items: {len(self.all_original_ocr_data)}")
             logger.info(f"RAG items: {self.all_rag_ready_data}")
             logger.info(f"RAG Data type: {self.all_rag_ready_data}")
             
@@ -396,8 +401,11 @@ class ResultService:
             if not self.wrong_answer_ids:
                 logger.info(f"Result: {self.result_id} - No wrong answer IDs found, skipping highlight generation.")
                 return
-            if not self.all_consolidated_data:
-                logger.warning(f"Result: {self.result_id} - No consolidated data available, skipping highlight generation.")
+            if not self.all_visualization_data:
+                logger.warning(f"Result: {self.result_id} - No visualization data available, skipping highlight generation.")
+                return
+            if not self.all_original_ocr_data:
+                logger.warning(f"Result: {self.result_id} - No original ocr data available, skipping highlight generation.")
                 return
             if not self.png_files: 
                 logger.warning(f"Result: {self.result_id} - No image paths available (self.png_files is empty), skipping highlight generation.")
@@ -413,11 +421,20 @@ class ResultService:
             await asyncio.to_thread(
                 draw_underlines_for_incorrect_answers_enhanced,
                 incorrect_rag_ids=self.wrong_answer_ids,
-                all_consolidated_data=self.all_consolidated_data,
-                all_rag_ready_data=self.all_rag_ready_data, 
-                page_image_paths=self.png_files, 
+                all_visualization_data=self.all_visualization_data,
+                all_original_ocr_data=self.all_original_ocr_data,
+                page_image_paths=self.png_files,
                 output_folder=str(output_highlight_folder),
             )
+            
+            generated_files = list(output_highlight_folder.glob("*.png"))
+
+            logger.info(f"Result: {self.result_id} - Generated files count: {len(generated_files)}")
+            if generated_files:
+                logger.info(f"Result: {self.result_id} - Generated file names: {[f.name for f in generated_files]}")
+            else:
+                logger.warning(f"Result: {self.result_id} - No files were generated by draw_underlines_for_incorrect_answers_enhanced")
+
             
             logger.info(f"Result: {self.result_id} - Highlight image generation completed by result_sdk.")
             
@@ -440,7 +457,7 @@ class ResultService:
             
             # 하이라이트 이미지가 있는지 확인
             if highlight_dir.exists():
-                highlight_files = list(highlight_dir.glob("page_*_visualized_*.png"))
+                highlight_files = list(highlight_dir.glob("*.png"))
             
             self.highlight_urls = []
             

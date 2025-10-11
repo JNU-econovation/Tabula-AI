@@ -1,34 +1,47 @@
-# 파일명: llm_interaction.py
+"""
+LLM(Large Language Model) 상호작용 모듈
+OCR 결과를 LLM 프롬프트로 변환, API 호출, 응답 처리 기능 포함
+"""
 
 import re
+import json
 import google.generativeai as genai
 from PIL import Image
-# PROMPT_TEMPLATE will be passed as an argument
+from result_sdk.config import settings
 
-# 이 함수는 OCR 결과를 LLM 프롬프트의 일부로 변환합니다.
 def format_ocr_results_for_prompt(ocr_block_results: list) -> str:
-    """ID가 할당된 OCR 블록 결과를 LLM 프롬프트용 문자열로 포맷합니다."""
+    """ID 할당된 OCR 블록 결과를 LLM 프롬프트용 문자열로 포맷"""
     return "\n".join([f"ID({item.get('page_num')},{item.get('block_id')},{item.get('y_idx')},{item.get('x_idx')}): {item.get('text')}" for item in ocr_block_results])
 
-# 이 함수는 포맷된 OCR 결과 문자열과 프롬프트 템플릿을 결합합니다.
 def build_full_prompt(ocr_chunk_list_str: str, prompt_template: str) -> str:
-    """OCR 청크 문자열과 프롬프트 템플릿을 결합하여 전체 프롬프트를 생성합니다."""
+    """OCR 청크 문자열과 프롬프트 템플릿을 결합해 전체 프롬프트 생성"""
     return prompt_template.replace("{ocr_chunk_list_placeholder}", ocr_chunk_list_str)
 
-# LLM 호출 함수 (이전 답변에서 개선된 버전)
 def get_llm_response(full_prompt: str, image_path: str,
                      generation_config_dict: dict, safety_settings_list: list = None) -> str:
+    """
+    LLM API 호출 후 응답 반환
+
+    Args:
+        full_prompt (str): LLM에 전달할 전체 프롬프트
+        image_path (str): 함께 전달할 이미지 파일 경로
+        generation_config_dict (dict): LLM 생성 관련 설정
+        safety_settings_list (list, optional): LLM 안전 설정, 없으면 기본값 사용
+
+    Returns:
+        str: LLM 응답 텍스트. 오류 시 "LLM_RESPONSE_ERROR:" 접두사 붙은 오류 메시지 반환
+    """
     ERROR_PREFIX = "LLM_RESPONSE_ERROR: "
     try:
         img = Image.open(image_path)
     except FileNotFoundError:
-        return f"{ERROR_PREFIX}Image file not found."
+        return f"{ERROR_PREFIX}이미지 파일 없음"
     except Exception as e:
-        return f"{ERROR_PREFIX}Error opening image: {str(e)}"
+        return f"{ERROR_PREFIX}이미지 열기 오류: {str(e)}"
     
-    # 모델 이름은 필요에 따라 config 등에서 관리하거나 직접 지정할 수 있습니다.
-    # 현재 사용 중인 모델로 유지 (또는 'gemini-1.5-flash-latest')
-    model = genai.GenerativeModel('gemini-1.5-flash-latest') # 안정적인 버전으로 변경 권장
+    model_name_to_use = settings.LLM_MODEL_NAME
+    print(f"  Using LLM Model: {model_name_to_use}")
+    model = genai.GenerativeModel(model_name_to_use)
     contents = [full_prompt, img]
 
     current_safety_settings = safety_settings_list
@@ -36,16 +49,17 @@ def get_llm_response(full_prompt: str, image_path: str,
         print("  Warning: safety_settings_list is None. Applying default BLOCK_NONE settings.")
         if hasattr(genai.types, 'HarmCategory') and hasattr(genai.types, 'HarmBlockThreshold'):
             current_safety_settings = [
-                {"category": genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
-                {"category": genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
-                {"category": genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
-                {"category": genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
+                {"category": cat, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE}
+                for cat in [
+                    genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                    genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                    genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                    genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                ]
             ]
         else:
-            print("  Error: Cannot apply default safety settings because HarmCategory or HarmBlockThreshold is not available. LLM might use its own defaults.")
-            # 이 경우, safety_settings를 None으로 두어 LLM 기본 설정을 따르거나,
-            # 혹은 더 강력한 오류 처리를 할 수 있습니다. 여기서는 None으로 유지합니다.
-            current_safety_settings = None # 명시적으로 None으로 설정
+            print("  Error: Cannot apply default safety settings because HarmCategory or HarmBlockThreshold is not available.")
+            current_safety_settings = None
 
     try:
         response = model.generate_content(
@@ -55,257 +69,140 @@ def get_llm_response(full_prompt: str, image_path: str,
         )
 
         if not response.candidates:
-            feedback_info = "Unknown reason"
-            if response.prompt_feedback:
-                block_reason_str = str(response.prompt_feedback.block_reason) if hasattr(response.prompt_feedback, 'block_reason') and response.prompt_feedback.block_reason else "N/A"
-                safety_ratings_str = str(response.prompt_feedback.safety_ratings) if hasattr(response.prompt_feedback, 'safety_ratings') and response.prompt_feedback.safety_ratings else "N/A"
-                feedback_info = f"Block Reason: {block_reason_str}, Safety Ratings: {safety_ratings_str}"
-            # print(f"  LLM Error: No candidates returned. Feedback: {feedback_info}") # 상세 로그는 여기서 관리
-            return f"{ERROR_PREFIX}Request was blocked or no candidates. Feedback: {feedback_info}"
+            feedback_info = _format_prompt_feedback(getattr(response, 'prompt_feedback', None))
+            return f"{ERROR_PREFIX}요청 차단 또는 후보 응답 없음. 피드백: {feedback_info}"
 
         candidate = response.candidates[0]
+        finish_reason_val = getattr(getattr(candidate, 'finish_reason', None), 'value', getattr(candidate, 'finish_reason', 0))
         
-        finish_reason_value = 0 
-        finish_reason_name_str = "UNSPECIFIED" # 기본값
+        if finish_reason_val == 3: # SAFETY
+            detailed_feedback = _format_prompt_feedback(getattr(response, 'prompt_feedback', None))
+            return f"{ERROR_PREFIX}안전 설정에 의해 콘텐츠 차단됨. 상세 피드백: {detailed_feedback}"
+        elif finish_reason_val == 2: # MAX_TOKENS
+            return f"{ERROR_PREFIX}최대 출력 토큰 제한으로 응답 중단"
 
-        if hasattr(candidate, 'finish_reason'):
-            if hasattr(candidate.finish_reason, 'value'): # Enum 객체일 경우
-                finish_reason_value = candidate.finish_reason.value
-            else: # 숫자 값일 경우
-                finish_reason_value = candidate.finish_reason
+        if not getattr(candidate, 'content', None) or not getattr(candidate.content, 'parts', None):
+            return f"{ERROR_PREFIX}응답에 유효한 콘텐츠 파트 없음 (종료 사유: {finish_reason_val})"
         
-        can_use_finish_reason_enum = hasattr(genai.types, 'FinishReason')
-        if can_use_finish_reason_enum:
-            try:
-                finish_reason_name_str = genai.types.FinishReason(finish_reason_value).name
-            except ValueError: # enum에 없는 값일 경우 대비
-                 finish_reason_name_str = f"UNKNOWN_REASON_VALUE_{finish_reason_value}"
-            except Exception as e_enum: # 기타 예외
-                print(f"  Warning: Could not get FinishReason enum name for value {finish_reason_value} (Error: {e_enum}). Using numeric value.")
-                finish_reason_name_str = str(finish_reason_value)
-        else:
-            print(f"  Warning: genai.types.FinishReason enum not found in genai.types. Using numeric finish_reason value ({finish_reason_value}).")
-            finish_reason_name_str = str(finish_reason_value) # 숫자 값으로 사용
-            
-        print(f"  LLM Candidate Finish Reason: {finish_reason_name_str} (Value: {finish_reason_value})")
+        return response.text
 
-        # FinishReason 값에 따른 처리 (숫자 값으로 비교)
-        # (참고: genai.types.FinishReason.SAFETY.value 는 3, .MAX_TOKENS.value는 2, .STOP.value는 1 - 라이브러리 버전에 따라 확인 필요)
-        # 사용자 로그에서는 2가 SAFETY로 나왔으므로, 해당 값을 기준으로 함
-        OBSERVED_FINISH_REASON_SAFETY_INT = 2 
-        OBSERVED_FINISH_REASON_STOP_INT = 1 
-        OBSERVED_FINISH_REASON_MAX_TOKENS_INT = -1 # 이전 로그에서 MAX_TOKENS는 관찰되지 않음, 임의의 값. 실제로는 2
+    except Exception as e:
+        return f"{ERROR_PREFIX}LLM API 호출 중 오류 발생: {str(e)}"
 
-        if finish_reason_value == OBSERVED_FINISH_REASON_SAFETY_INT:
-            feedback_info = "Not available"
-            if response.prompt_feedback:
-                block_reason_str = str(response.prompt_feedback.block_reason) if hasattr(response.prompt_feedback, 'block_reason') and response.prompt_feedback.block_reason else "N/A"
-                safety_ratings_str = str(response.prompt_feedback.safety_ratings) if hasattr(response.prompt_feedback, 'safety_ratings') and response.prompt_feedback.safety_ratings else "N/A"
-                feedback_info = f"Block Reason: {block_reason_str}, Safety Ratings: {safety_ratings_str}"
-            # print(f"  LLM Error: Content blocked due to safety settings (Finish Reason Value: {finish_reason_value}). Feedback: {feedback_info}")
-            return f"{ERROR_PREFIX}Content blocked by safety settings. Finish Reason: {finish_reason_name_str} ({finish_reason_value}). Feedback: {feedback_info}"
-        
-        # 응답에 유효한 텍스트 Part가 있는지 확인
-        if not candidate.content or not candidate.content.parts:
-            return f"{ERROR_PREFIX}No valid content part in LLM response. Finish reason: {finish_reason_name_str} ({finish_reason_value})"
-        
-        try:
-            return response.text # 성공적인 경우
-        except Exception as e_text: # response.text 접근 시 발생할 수 있는 추가 오류 (예: 라이브러리 내부 오류)
-            # print(f"  LLM Error: Failed to access response.text. Finish Reason: {finish_reason_name_str}, Error: {e_text}")
-            return f"{ERROR_PREFIX}Failed to extract text from LLM response. Finish Reason: {finish_reason_name_str} ({finish_reason_value}). Error: {str(e_text)}"
+def _format_prompt_feedback(prompt_feedback) -> str:
+    """프롬프트 피드백 객체를 읽기 좋은 문자열로 포맷"""
+    if not prompt_feedback:
+        return "피드백 정보 없음"
 
-    except AttributeError as e_attr: 
-        print(f"  LLM Response Processing AttributeError: {e_attr} (Hint: Check 'google-generativeai' library version or installation. Try: pip install --upgrade google-generativeai)")
-        return f"{ERROR_PREFIX}Error processing LLM response attribute: {str(e_attr)}"
-    except Exception as e_main:
-        # print(f"  LLM API Call Exception: {e_main}")
-        return f"{ERROR_PREFIX}Error during LLM API call: {str(e_main)}"
+    reason = getattr(prompt_feedback, 'block_reason', 'N/A')
+    ratings = "\n".join([
+        f"  - 카테고리: {getattr(r.category, 'name', r.category)}, 확률: {getattr(r.probability, 'name', r.probability)}"
+        for r in getattr(prompt_feedback, 'safety_ratings', [])
+    ])
+    return f"차단 사유: {reason}, 안전 등급: \n{ratings if ratings else 'N/A'}"
 
-# LLM 결과 처리 및 통합 함수 (변경 없음)
 def process_llm_and_integrate(llm_output_string: str, original_ocr_results_for_block: list) -> tuple[list, list]:
-    llm_processed_info = {}
-    line_pattern = re.compile(r"ID\((\d+),(\d+),(\d+),(\d+)\):\s*(.*)")
-    merged_pattern = re.compile(r"__MERGED_TO_ID\((\d+),(\d+),(\d+),(\d+)\)__")
+    """
+    LLM의 JSON 응답을 파싱해 RAG 및 시각화 데이터 생성
+
+    - 반환값 1: 시각화용 데이터 (LLM 출력 형식과 거의 동일)
+    - 반환값 2: RAG용 데이터
+    """
+    def _fallback_to_error_state(original_data):
+        # 오류 시 원본 데이터를 RAG 형식으로 변환해 최소 데이터 보존
+        rag_fallback = [
+            [[item['page_num'], item['block_id'], item['y_idx'], item['x_idx']], [item['text']]]
+            for item in original_data
+        ]
+        return [], rag_fallback
 
     if llm_output_string.startswith("LLM_RESPONSE_ERROR:"):
-        print(f"  LLM Error detected by custom prefix in process_llm_and_integrate: {llm_output_string}")
-        consolidated_data_block = []
-        for ocr_item in original_ocr_results_for_block:
-            item_copy = ocr_item.copy()
-            item_copy['llm_processed_text'] = ocr_item['text']
-            item_copy['llm_status'] = 'LLM_ERROR_FALLBACK'
-            consolidated_data_block.append(item_copy)
-        return consolidated_data_block, []
+        print(f"  LLM Error detected by custom prefix: {llm_output_string}")
+        return _fallback_to_error_state(original_ocr_results_for_block)
 
-    for line in llm_output_string.strip().split('\n'):
-        line_match = line_pattern.match(line)
-        if not line_match:
-            # print(f"  Warning: Could not parse LLM output line in process_llm_and_integrate: '{line}'")
-            continue
-        page_num, block_id_from_llm, y_idx, x_idx = map(int, line_match.group(1, 2, 3, 4)) # block_id는 LLM 응답에서 온 것
-        content = line_match.group(5).strip()
-        # current_id_tuple은 LLM 응답의 ID를 사용
-        current_id_tuple = (page_num, block_id_from_llm, y_idx, x_idx) 
-        
-        merged_match = merged_pattern.match(content)
-        if merged_match:
-            target_p, target_b, target_y, target_x = map(int, merged_match.group(1, 2, 3, 4))
-            llm_processed_info[current_id_tuple] = {
-                "status": "MERGED", "text": content,
-                "target_id": (target_p, target_b, target_y, target_x)
-            }
-        elif content == "__REMOVED__":
-            llm_processed_info[current_id_tuple] = {"status": "REMOVED", "text": ""}
-        else:
-            llm_processed_info[current_id_tuple] = {"status": "PROCESSED", "text": content}
+    try:
+        # LLM 응답에서 JSON 코드 블록 마커 제거
+        clean_json_string = re.sub(r'^\s*```json\s*|\s*```\s*$', '', llm_output_string.strip(), flags=re.DOTALL)
+        visualization_data = json.loads(clean_json_string)
+        if not isinstance(visualization_data, list):
+            raise json.JSONDecodeError("LLM 출력이 리스트 형식이 아님", clean_json_string, 0)
+    except (json.JSONDecodeError, TypeError) as e:
+        print(f"  Error parsing LLM JSON response: {e}\n  Response was: '{llm_output_string[:200]}...'")
+        return _fallback_to_error_state(original_ocr_results_for_block)
 
-    consolidated_data_block = []
-    for ocr_item in original_ocr_results_for_block: # 이 ocr_item의 block_id는 현재 처리중인 블록의 ID
-        # LLM 응답에서 파싱된 ID와 비교해야 함.
-        # LLM은 프롬프트에 제공된 ID(page, block, y, x) 그대로 응답해야 함.
-        item_id_tuple = (ocr_item['page_num'], ocr_item['block_id'], ocr_item['y_idx'], ocr_item['x_idx'])
-        integrated_item = ocr_item.copy()
-        if item_id_tuple in llm_processed_info:
-            llm_info = llm_processed_info[item_id_tuple]
-            integrated_item['llm_processed_text'] = llm_info['text']
-            integrated_item['llm_status'] = llm_info['status']
-            if llm_info['status'] == 'MERGED':
-                integrated_item['llm_merged_target_id'] = llm_info['target_id']
-        else:
-            integrated_item['llm_processed_text'] = ocr_item['text']
-            integrated_item['llm_status'] = 'UNPROCESSED_BY_LLM'
-        consolidated_data_block.append(integrated_item)
-
+    id_pattern = re.compile(r"ID\((\d+),(\d+),(\d+),(\d+)\)")
     rag_ready_data_block = []
-    for item in consolidated_data_block:
-        if item.get('llm_status') == 'PROCESSED' and item.get('llm_processed_text','').strip():
-            id_list_for_rag = [item['page_num'], item['block_id'], item['y_idx'], item['x_idx']]
-            text_for_rag = item['llm_processed_text']
-            rag_ready_data_block.append([id_list_for_rag, [text_for_rag]])
-    return consolidated_data_block, rag_ready_data_block
 
-# LLM_interaction.py TestCode
+    for id_list, sentence in visualization_data:
+        if not id_list:
+            continue
+        
+        # 첫 ID를 대표 ID로 사용해 RAG 데이터 생성
+        match = id_pattern.match(id_list[0])
+        if match:
+            rag_id_tuple = tuple(map(int, match.groups()))
+            rag_ready_data_block.append([list(rag_id_tuple), [sentence]])
+
+    return visualization_data, rag_ready_data_block
+
 if __name__ == '__main__':
     print("--- LLM_interaction.py 테스트 시작 ---")
 
-    # 테스트를 위한 기본 설정 (실제 환경에서는 config.py 등에서 관리)
-    # API 키 설정 (환경 변수에서 로드)
     from dotenv import load_dotenv
     import os
 
     load_dotenv()
     GOOGLE_API_KEY_TEST = os.getenv("GOOGLE_API_KEY")
     if not GOOGLE_API_KEY_TEST:
-        print("오류: 테스트를 위해 GOOGLE_API_KEY 환경 변수를 설정해주세요.")
+        print("오류: 테스트를 위해 GOOGLE_API_KEY 환경 변수 설정 필요")
         exit()
-    try:
-        genai.configure(api_key=GOOGLE_API_KEY_TEST)
-        print("Google Generative AI SDK 설정 완료 (테스트용).")
-    except Exception as e:
-        print(f"오류: Google Generative AI SDK 설정 실패 - {e}")
-        exit()
+    genai.configure(api_key=GOOGLE_API_KEY_TEST)
 
-    # --- 1. format_ocr_results_for_prompt 함수 테스트 ---
-    print("\n[1. format_ocr_results_for_prompt 함수 테스트]")
-    mock_ocr_block_for_format = [
-        {'page_num': 1, 'block_id': 0, 'y_idx': 1, 'x_idx': 1, 'text': '첫번째'},
-        {'page_num': 1, 'block_id': 0, 'y_idx': 1, 'x_idx': 2, 'text': '텍스트'},
-        {'page_num': 1, 'block_id': 0, 'y_idx': 2, 'x_idx': 1, 'text': '다음줄'},
+    print("\n[1. format_ocr_results_for_prompt 테스트]")
+    mock_ocr_data = [
+        {'page_num': 1, 'block_id': 0, 'y_idx': 1, 'x_idx': 1, 'text': '첫번째 텍스트'},
+        {'page_num': 1, 'block_id': 0, 'y_idx': 2, 'x_idx': 1, 'text': '다음 줄'},
     ]
-    formatted_ocr_string = format_ocr_results_for_prompt(mock_ocr_block_for_format)
-    print("포맷된 OCR 문자열:")
-    print(formatted_ocr_string)
-    assert formatted_ocr_string == "ID(1,0,1,1): 첫번째\nID(1,0,1,2): 텍스트\nID(1,0,2,1): 다음줄"
-    print("format_ocr_results_for_prompt 함수 테스트 통과!")
+    formatted_string = format_ocr_results_for_prompt(mock_ocr_data)
+    print(f"포맷된 문자열:\n{formatted_string}")
+    assert formatted_string == "ID(1,0,1,1): 첫번째 텍스트\nID(1,0,2,1): 다음 줄"
+    print("-> 통과")
 
-    # --- 2. build_full_prompt 함수 테스트 ---
-    print("\n[2. build_full_prompt 함수 테스트]")
-    try:
-        # text_processing 내의 Prompt.py에서 가져오도록 수정
-        from .Prompt import gemini_prompt as TEST_PROMPT_TEMPLATE
-        print("Prompt.py에서 gemini_prompt를 성공적으로 가져왔습니다.")
-    except ImportError:
-        print("Warning: Prompt.py 또는 gemini_prompt를 찾을 수 없습니다. 임시 프롬프트 템플릿을 사용합니다.")
-        TEST_PROMPT_TEMPLATE = "OCR Data:\n{ocr_chunk_list_placeholder}\n\nImage Context:\n(이미지 있음)"
-    
-    full_prompt_built = build_full_prompt(formatted_ocr_string, TEST_PROMPT_TEMPLATE)
-    print("생성된 전체 프롬프트 (일부):")
-    print(full_prompt_built[:200] + "...") # 너무 길면 일부만 출력
-    assert "{ocr_chunk_list_placeholder}" not in full_prompt_built
-    assert formatted_ocr_string in full_prompt_built
-    print("build_full_prompt 함수 테스트 통과!")
+    print("\n[2. build_full_prompt 테스트]")
+    test_template = "데이터:\n{ocr_chunk_list_placeholder}\n---"
+    full_prompt = build_full_prompt(formatted_string, test_template)
+    print(f"생성된 프롬프트(일부):\n{full_prompt[:100]}...")
+    assert "{ocr_chunk_list_placeholder}" not in full_prompt
+    print("-> 통과")
 
-    # --- 3. get_llm_response 함수 테스트 (실제 API 호출 발생!) ---
-    print("\n[3. get_llm_response 함수 테스트 (실제 API 호출)]")
-    print("주의: 이 테스트는 실제 LLM API를 호출하므로 비용이 발생할 수 있고, 시간이 소요될 수 있습니다.")
-    
-    sample_image_path = "" 
-
+    print("\n[3. get_llm_response 테스트 (API 호출)]")
+    sample_image_path = "sample_image.png" # 테스트용 이미지 경로
     if os.path.exists(sample_image_path):
-        test_generation_config = {"temperature": 0.1, "max_output_tokens": 50} 
-        test_safety_settings = [ 
-            {"category": genai.types.HarmCategory.HARM_CATEGORY_HARASSMENT, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
-            {"category": genai.types.HarmCategory.HARM_CATEGORY_HATE_SPEECH, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
-            {"category": genai.types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
-            {"category": genai.types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT, "threshold": genai.types.HarmBlockThreshold.BLOCK_NONE},
-        ]
-        
-        simple_ocr_for_llm_test = "ID(1,0,1,1): 안녕하세요"
-        simple_full_prompt = TEST_PROMPT_TEMPLATE.replace("{ocr_chunk_list_placeholder}", simple_ocr_for_llm_test)
-        
-        print(f"LLM에 전달할 간단한 프롬프트: {simple_full_prompt[:100]}...")
-        llm_response = get_llm_response(simple_full_prompt, sample_image_path, test_generation_config, test_safety_settings)
-        print("LLM 응답:")
-        print(llm_response)
-        if llm_response.startswith("LLM_RESPONSE_ERROR:"):
-            print("get_llm_response 함수 테스트 중 오류 발생 (예상된 오류일 수 있음).")
+        test_config = {"temperature": 0.1, "max_output_tokens": 50}
+        response = get_llm_response("ID(1,0,1,1): 안녕하세요", sample_image_path, test_config)
+        print(f"LLM 응답:\n{response}")
+        if response.startswith("LLM_RESPONSE_ERROR:"):
+            print("-> 오류 발생 (예상 가능)")
         else:
-            print("get_llm_response 함수 테스트 (일단) 통과!")
+            print("-> 통과")
     else:
-        print(f"경고: 테스트 이미지 경로 '{sample_image_path}'를 찾을 수 없어 get_llm_response 테스트를 건너<0xEB><0x9C><0x85>니다.")
+        print(f"경고: 테스트 이미지 '{sample_image_path}'가 없어 get_llm_response 테스트 건너뜀")
 
-
-    # --- 4. process_llm_and_integrate 함수 테스트 ---
-    print("\n[4. process_llm_and_integrate 함수 테스트]")
-    mock_llm_output = """ID(1,0,1,1): 수정된 첫번째 텍스트
-ID(1,0,1,2): __MERGED_TO_ID(1,0,1,1)__
-ID(1,0,2,1): __REMOVED__
-ID(1,0,3,1): 이것은 처리됨"""
-
-    mock_original_for_integrate = [
-        {'page_num': 1, 'block_id': 0, 'y_idx': 1, 'x_idx': 1, 'text': '원본 첫번째', 'x1':10, 'y1':10, 'x2':20, 'y2':20, 'bounding_box':[]},
-        {'page_num': 1, 'block_id': 0, 'y_idx': 1, 'x_idx': 2, 'text': '원본 텍스트', 'x1':20, 'y1':10, 'x2':30, 'y2':20, 'bounding_box':[]},
-        {'page_num': 1, 'block_id': 0, 'y_idx': 2, 'x_idx': 1, 'text': '원본 다음줄', 'x1':10, 'y1':20, 'x2':20, 'y2':30, 'bounding_box':[]},
-        {'page_num': 1, 'block_id': 0, 'y_idx': 3, 'x_idx': 1, 'text': '이것은', 'x1':10, 'y1':30, 'x2':20, 'y2':40, 'bounding_box':[]},
-        {'page_num': 1, 'block_id': 0, 'y_idx': 3, 'x_idx': 2, 'text': '처리안됨', 'x1':20, 'y1':30, 'x2':30, 'y2':40, 'bounding_box':[]}, 
+    print("\n[4. process_llm_and_integrate 테스트]")
+    mock_llm_json = """
+    ```json
+    [
+      [["ID(1,0,1,1)"], "수정된 텍스트"],
+      [["ID(1,0,2,1)", "ID(1,0,2,2)"], "병합된 텍스트"]
     ]
-
-    consolidated_data, rag_data = process_llm_and_integrate(mock_llm_output, mock_original_for_integrate)
-    
-    print("통합된 데이터 (Consolidated Data):")
-    for item in consolidated_data:
-        print(f"  ID({item['page_num']},{item['block_id']},{item['y_idx']},{item['x_idx']}) "
-              f"Orig: '{item['text']}', LLM: '{item['llm_processed_text']}', Status: {item['llm_status']}"
-              + (f", MergedTo: {item['llm_merged_target_id']}" if 'llm_merged_target_id' in item else ""))
-
-    print("\nRAG 준비 데이터 (RAG Ready Data):")
-    for item in rag_data:
-        print(f"  {item}")
-
-    assert len(consolidated_data) == 5
-    assert consolidated_data[0]['llm_status'] == 'PROCESSED'
-    assert consolidated_data[0]['llm_processed_text'] == '수정된 첫번째 텍스트'
-    assert consolidated_data[1]['llm_status'] == 'MERGED'
-    assert consolidated_data[1]['llm_merged_target_id'] == (1,0,1,1)
-    assert consolidated_data[2]['llm_status'] == 'REMOVED'
-    assert consolidated_data[3]['llm_status'] == 'PROCESSED'
-    assert consolidated_data[4]['llm_status'] == 'UNPROCESSED_BY_LLM' 
-    
-    assert len(rag_data) == 2 
-    assert rag_data[0][0] == [1,0,1,1] 
-    assert rag_data[1][0] == [1,0,3,1] 
-
-    print("process_llm_and_integrate 함수 테스트 통과!")
+    ```
+    """
+    viz_data, rag_data = process_llm_and_integrate(mock_llm_json, [])
+    print("시각화 데이터:", json.dumps(viz_data, indent=2, ensure_ascii=False))
+    print("RAG 데이터:", rag_data)
+    assert len(rag_data) == 2
+    assert rag_data[0] == [[1, 0, 1, 1], ['수정된 텍스트']]
+    assert rag_data[1] == [[1, 0, 2, 1], ['병합된 텍스트']]
+    print("-> 통과")
 
     print("\n--- LLM_interaction.py 테스트 종료 ---")

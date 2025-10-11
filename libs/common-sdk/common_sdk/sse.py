@@ -235,4 +235,11 @@ async def result_progress_generator(result_id: str, service: Any = None):
 
 def get_result_progress_stream(result_id: str, service: Any = None):
     """Result용 진행률 스트림 반환"""
-    return EventSourceResponse(result_progress_generator(result_id, service))
+    return EventSourceResponse(
+        result_progress_generator(result_id, service),
+        headers={
+            "X-Accel-Buffering": "no", 
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive"
+        }
+    )
