@@ -75,6 +75,8 @@ async def upload_file(
         if len(reader.pages) > FILE_PAGE_LIMIT:
             logger.error(f"User: {userId} - File page exceeds limit: {len(reader.pages)}")
             raise NoteFilePageExceeded()
+        # 파일 포인터를 처음으로 되돌림
+        await file.seek(0)
 
     try:
         # space_id 생성
