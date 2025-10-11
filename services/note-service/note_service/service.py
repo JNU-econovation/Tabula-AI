@@ -10,9 +10,8 @@ from note_sdk.image_processor import ImageSummary
 from note_sdk.vector_store import VectorLoader
 from common_sdk.sse import update_progress
 from common_sdk.crud.mongodb import MongoDB
-from common_sdk.utils import num_tokens_from_string
 from note_sdk.config import settings
-from common_sdk.exceptions import FileNotFoundError, TokenExceeded
+from common_sdk.exceptions import FileNotFoundError
 from common_sdk.get_logger import get_logger
 from common_sdk.constants import ProgressPhase, StatusMessage
 
@@ -191,12 +190,6 @@ class NoteService:
         
         with open(md_path, 'r', encoding='utf-8') as f:
             content = f.read()
-            
-        # 토큰 수 체크
-        token_count = num_tokens_from_string(content)
-        if token_count > settings.MAX_TEXT_TOKEN:
-            logger.error(f"[NoteService] User: {self.user_id} - Text token exceeded: {token_count} > {settings.MAX_TEXT_TOKEN}")
-            raise TokenExceeded()
         
         success = await self.vector_loader.process_markdown(content, self.document_id)
         return success
@@ -205,15 +198,6 @@ class NoteService:
     async def generate_keywords(self):
         md_path = self.md_dir / f"{self.document_id}.md"
         
-        with open(md_path, 'r', encoding='utf-8') as f:
-            content = f.read()
-            
-        # 토큰 수 체크
-        token_count = num_tokens_from_string(content)
-        if token_count > settings.MAX_TEXT_TOKEN:
-            logger.error(f"[NoteService] User: {self.user_id} - Token count exceeded: {token_count} > {settings.MAX_TEXT_TOKEN}")
-            raise TokenExceeded()
-            
         keyword_result = self.keyword_guide.generate_mindmap_from_markdown(str(md_path))
         
         if keyword_result:

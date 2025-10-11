@@ -4,7 +4,7 @@ from .handler import *
 
 __all__ = ['InvalidJWT', 'ExpiredJWT', 'EmptyJWT',
            'MissingFieldData',
-           'MissingNoteFileData', 'UnsupportedNoteFileFormat', 'NoteFileSizeExceeded',
+           'MissingNoteFileData', 'UnsupportedNoteFileFormat', 'NoteFileSizeExceeded', 'NoteFilePageExceeded',
            'MissingResultFileData', 'UnsupportedResultFileFormat', 'ResultFileSizeExceeded', 'ResultFileUploadPageExceeded',
            'MissingSpaceId', 'SpaceIdNotFound',
            'MissingResultId', 'ResultIdNotFound',

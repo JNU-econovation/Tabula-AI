@@ -1,5 +1,7 @@
 from bson import ObjectId
 from typing import Dict, Any
+from PyPDF2 import PdfReader
+from io import BytesIO
 from fastapi import APIRouter, UploadFile, Form, Depends, File
 
 from note_service.service import NoteService
@@ -11,8 +13,9 @@ from note_sdk.config import settings
 from common_sdk.swagger import note_service_response, note_service_space_response
 from common_sdk.exceptions import (
     UnsupportedNoteFileFormat, NoteFileSizeExceeded, SpaceIdNotFound, 
-    MissingSpaceId, MissingNoteFileData, MissingFieldData, TokenExceeded
+    MissingSpaceId, MissingNoteFileData, MissingFieldData, NoteFilePageExceeded
 )
+
 
 from common_sdk.get_logger import get_logger
 
@@ -29,8 +32,10 @@ service_instances: Dict[str, NoteService] = {}
 s3_storage = S3Storage()
 mongodb = MongoDB()
 
-# 지원하는 파일 형식
-ALLOWED_FILE_TYPES = ["application/pdf"]
+# 상수 선언
+ALLOWED_FILE_TYPES = ["application/pdf"] # 지원하는 파일 형식
+FILE_SIZE_LIMIT = 10 * 1024 * 1024 # 파일 용량 제한
+FILE_PAGE_LIMIT = 50 # 파일 페이지 제한
 
 # 학습 자료 업로드 API
 @router.post("/{folderId}/upload", responses=note_service_response)
@@ -58,9 +63,20 @@ async def upload_file(
         raise UnsupportedNoteFileFormat()
     
     # 파일 용량 검증
-    if file.size > 10 * 1024 * 1024:  # 10MB
+    if file.size > FILE_SIZE_LIMIT:
         logger.error(f"User: {userId} - File size exceeds limit: {file.size}")
         raise NoteFileSizeExceeded()
+    
+    # PDF 페이지 수 검증
+    if file.content_type == "application/pdf":
+        # 파일 전체를 메모리로 읽음
+        file_bytes = await file.read()
+        reader = PdfReader(BytesIO(file_bytes))
+        if len(reader.pages) > FILE_PAGE_LIMIT:
+            logger.error(f"User: {userId} - File page exceeds limit: {len(reader.pages)}")
+            raise NoteFilePageExceeded()
+        # 파일 포인터를 처음으로 되돌림
+        await file.seek(0)
 
     try:
         # space_id 생성
@@ -148,12 +164,6 @@ async def get_progress(
         # SSE 연결 시작
         return get_progress_stream(spaceId, service)
         
-    except TokenExceeded as e:
-        logger.error(f"User: {user_id} - Token limit exceeded: {str(e)}")
-        update_progress(spaceId, -1, {
-            "status": "문서 크기가 너무 크기 때문에 더 작은 문서를 업로드해주세요."
-        })
-        raise
     except Exception as e:
         logger.error(f"User: {user_id} - Error in get_progress: {str(e)}")
         update_progress(spaceId, -1, {
