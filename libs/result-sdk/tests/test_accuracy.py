@@ -12,7 +12,6 @@ python -m tests.test_accuracy --input_file [테스트할 파일 경로] --output
 import os
 import shutil
 import argparse
-from google.auth import default
 import google.generativeai as genai
 from result_sdk.config import settings
 from result_sdk.text_processing import process_document
@@ -130,7 +129,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description="Accuracy Test Script for OCR-LLM Pipeline")
     parser.add_argument(
         "--input_file",
-        default='/Users/ki/Downloads/CleanShot 2025-09-17 at 14.16.23@2x.png',
+        default='/Users/ki/Desktop/Google Drive/Dev/Ecode/OCR_Test/예시_한국사.pdf',
+        #default='/Users/ki/Desktop/test1.pdf',
         help="Path to the PDF or image file to process for testing."
     )
     parser.add_argument(

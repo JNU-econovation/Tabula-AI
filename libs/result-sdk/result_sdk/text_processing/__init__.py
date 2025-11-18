@@ -7,10 +7,11 @@ from .LLM_interaction import (
     process_llm_and_integrate,
 )
 from .OCR_Processor import (
-    process_document_ocr,
-    parse_docai_raw_words,
+    ocr_image,
+    parse_raw_words,
     find_vertical_split_point,
     assign_ids_after_split,
+    display_ocr_results,
 )
 
 __all__ = [
@@ -24,8 +25,9 @@ __all__ = [
     "get_llm_response",
     "process_llm_and_integrate",
     # from OCR_Processor.py
-    "process_document_ocr",
-    "parse_docai_raw_words",
+    "ocr_image",
+    "parse_raw_words",
     "find_vertical_split_point",
     "assign_ids_after_split",
+    "display_ocr_results",
 ]
