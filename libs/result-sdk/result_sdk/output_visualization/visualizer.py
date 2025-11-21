@@ -86,13 +86,42 @@ def draw_underlines_for_incorrect_answers_enhanced(
                     chunks_by_line_block[key].append(chunk)
                 
                 # 각 그룹(블록+줄)별로 밑줄 계산
+                # OCR이 좌우 단을 같은 블록으로 인식했거나(잘못된 병합), 
+                # 좌측 단어가 우측 블록에 포함된 경우를 대비해 물리적 간격(Gap)을 체크하여 분리
                 for _, line_chunks in chunks_by_line_block.items():
                     if not line_chunks:
                         continue
-                    min_x1 = min(c['x1'] for c in line_chunks)
-                    max_x2 = max(c['x2'] for c in line_chunks)
-                    underline_y = max(c['y2'] for c in line_chunks) + underline_offset
-                    lines_to_draw_on_page[page_num_of_sentence].append((min_x1, underline_y, max_x2, underline_y))
+                    
+                    # x1 좌표 기준으로 정렬
+                    sorted_chunks = sorted(line_chunks, key=lambda c: c['x1'])
+                    
+                    segments = []
+                    if sorted_chunks:
+                        current_segment = [sorted_chunks[0]]
+                        
+                        for i in range(1, len(sorted_chunks)):
+                            prev = sorted_chunks[i-1]
+                            curr = sorted_chunks[i]
+                            
+                            gap = curr['x1'] - prev['x2']
+                            # 임계값: 글자 높이의 3배 이상 떨어져 있으면 단 분리 등으로 간주하여 선을 끊음
+                            avg_height = ((prev['y2'] - prev['y1']) + (curr['y2'] - curr['y1'])) / 2
+                            threshold = avg_height * 3.0
+                            
+                            if gap > threshold:
+                                segments.append(current_segment)
+                                current_segment = [curr]
+                            else:
+                                current_segment.append(curr)
+                        segments.append(current_segment)
+                    
+                    # 분리된 각 세그먼트별로 밑줄 추가
+                    for segment in segments:
+                        min_x1 = min(c['x1'] for c in segment)
+                        max_x2 = max(c['x2'] for c in segment)
+                        # 높이는 해당 세그먼트 내 최대 y2 기준
+                        underline_y = max(c['y2'] for c in segment) + underline_offset
+                        lines_to_draw_on_page[page_num_of_sentence].append((min_x1, underline_y, max_x2, underline_y))
 
     if not lines_to_draw_on_page:
         print("  No lines found to underline.")
