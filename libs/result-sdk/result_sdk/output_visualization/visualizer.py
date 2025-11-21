@@ -106,7 +106,7 @@ def draw_underlines_for_incorrect_answers_enhanced(
                             gap = curr['x1'] - prev['x2']
                             # 임계값: 글자 높이의 3배 이상 떨어져 있으면 단 분리 등으로 간주하여 선을 끊음
                             avg_height = ((prev['y2'] - prev['y1']) + (curr['y2'] - curr['y1'])) / 2
-                            threshold = avg_height * 3.0
+                            threshold = avg_height * 5.0
                             
                             if gap > threshold:
                                 segments.append(current_segment)
