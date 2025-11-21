@@ -77,13 +77,16 @@ def draw_underlines_for_incorrect_answers_enhanced(
                         chunks_for_this_sentence.append(ocr_data_lookup[id_tuple])
             
             if chunks_for_this_sentence:
-                # 여러 줄에 걸친 문장을 처리하기 위해 y_idx를 기준으로 청크를 그룹화
-                chunks_by_line = defaultdict(list)
+                # 여러 줄에 걸친 문장 및 다단(Multi-column) 처리를 위해 (block_id, y_idx) 기준으로 그룹화
+                # block_id가 다르면 같은 y_idx라도 분리된 밑줄을 그어야 함
+                chunks_by_line_block = defaultdict(list)
                 for chunk in chunks_for_this_sentence:
-                    chunks_by_line[chunk['y_idx']].append(chunk)
+                    # 키: (블록ID, 줄번호)
+                    key = (chunk['block_id'], chunk['y_idx'])
+                    chunks_by_line_block[key].append(chunk)
                 
-                # 각 줄별로 밑줄을 계산하고 추가
-                for _, line_chunks in chunks_by_line.items():
+                # 각 그룹(블록+줄)별로 밑줄 계산
+                for _, line_chunks in chunks_by_line_block.items():
                     if not line_chunks:
                         continue
                     min_x1 = min(c['x1'] for c in line_chunks)
