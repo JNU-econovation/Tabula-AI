@@ -174,9 +174,87 @@ def display_ocr_results(ocr_results_list: list):
         print(f"ID({item.get('page_num')},{item.get('block_id')},{item.get('y_idx')},{item.get('x_idx')}): {item.get('text')}")
 
 if __name__ == '__main__':
-    # 모듈 직접 실행 시 테스트용 코드
-    # 예:
-    # dummy_response = { ... } # Vision API 응답과 유사한 더미 데이터
-    # raw_words = parse_raw_words(dummy_response)
-    # ... (이하 테스트 로직)
-    pass
+    import sys
+    import os
+    from pathlib import Path
+
+    # 현재 파일의 경로를 기준으로 프로젝트 루트 및 필요한 경로 설정
+    current_file = Path(__file__).resolve()
+    # libs/result-sdk
+    result_sdk_root = current_file.parent.parent.parent 
+    # Tabula-AI (Project Root)
+    project_root = result_sdk_root.parent.parent
+
+    # sys.path에 libs/result-sdk 추가하여 모듈 임포트 가능하게 함
+    sys.path.append(str(result_sdk_root))
+    
+    try:
+        from result_sdk.config import settings
+        
+        # 테스트 이미지 경로 설정 (존재하는 이미지 경로로 수정 필요)
+        # 예시 경로: libs/result-sdk/result_sdk/local_temp/pdf_pages_test_ea3d2b3b/test_page_1.png
+        test_image_relative_path = '/Users/ki/Desktop/Google Drive/Dev/Ecode/OCR_Test/center_test1.png'
+        image_path = project_root / test_image_relative_path
+        
+        print(f"Testing OCR with image: {image_path}")
+        print(f"Service Account File: {settings.SERVICE_ACCOUNT_FILE}")
+
+        if not image_path.exists():
+            print(f"Error: Image file not found at {image_path}")
+            # 대체 경로 시도 (절대 경로 등) 혹은 사용자에게 알림
+        else:
+            # 1. OCR Image
+            print("\n1. Calling OCR API...")
+            ocr_response = ocr_image(str(image_path), settings.SERVICE_ACCOUNT_FILE)
+            
+            # [Requested] Save Full OCR API Response JSON to file
+            output_json_path = project_root / "ocr_response_output.json"
+            print(f"\n--- Saving Full OCR API Response to {output_json_path} ---")
+            try:
+                with open(output_json_path, "w", encoding="utf-8") as f:
+                    json.dump(ocr_response, f, indent=2, ensure_ascii=False)
+                print("Successfully saved OCR response to JSON file.")
+            except Exception as e:
+                print(f"Failed to save JSON file: {e}")
+            print("-" * 50)
+
+            # 2. Parse Raw Words
+            print("\n2. Parsing raw words...")
+            raw_words = parse_raw_words(ocr_response)
+            print(f"   Found {len(raw_words)} words.")
+            
+            # [Requested] Display Parsed Raw Words (First 5 items)
+            print("\n--- Parsed Raw Words (First 5 items) ---")
+            for i, word in enumerate(raw_words[:5]):
+                print(f"{i+1}. Text: {word['text']}, Box: {word['bounding_box']}")
+            print("-" * 50)
+            
+            # 3. Find Split Point
+            image_width = 0
+            if 'fullTextAnnotation' in ocr_response:
+                 pages = ocr_response['fullTextAnnotation'].get('pages', [])
+                 if pages:
+                     image_width = pages[0].get('width', 0)
+            
+            if image_width == 0 and raw_words:
+                image_width = max(w['x2'] for w in raw_words) + 50
+                
+            print(f"\n3. Calculating split point (Image Width: {image_width})...")
+            split_x = find_vertical_split_point(raw_words, image_width)
+            print(f"   Split X: {split_x}")
+            
+            # 4. Assign IDs
+            print("\n4. Assigning IDs...")
+            processed_results = assign_ids_after_split(raw_words, split_x, page_num=1)
+            
+            # 5. Display Results
+            print("\n5. Results:")
+            display_ocr_results(processed_results)
+
+    except ImportError as e:
+        print(f"Import Error: {e}")
+        print("Make sure you are running this script with the correct PYTHONPATH or from the correct directory.")
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        import traceback
+        traceback.print_exc()
